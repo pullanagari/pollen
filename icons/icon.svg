@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#0d9488"/>
+  
+  <!-- Pollen grain / flower center -->
+  <circle cx="160" cy="256" r="50" stroke="white" stroke-width="10" fill="none"/>
+  <circle cx="160" cy="256" r="20" fill="white"/>
+  
+  <!-- Pollen spikes/texture -->
+  <circle cx="160" cy="196" r="8" fill="white"/>
+  <circle cx="160" cy="316" r="8" fill="white"/>
+  <circle cx="100" cy="256" r="8" fill="white"/>
+  <circle cx="220" cy="256" r="8" fill="white"/>
+  <circle cx="118" cy="214" r="6" fill="white"/>
+  <circle cx="202" cy="214" r="6" fill="white"/>
+  <circle cx="118" cy="298" r="6" fill="white"/>
+  <circle cx="202" cy="298" r="6" fill="white"/>
+  
+  <!-- Arrow -->
+  <path d="M230 256 L290 256" stroke="white" stroke-width="12" stroke-linecap="round"/>
+  <path d="M275 236 L295 256 L275 276" stroke="white" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  
+  <!-- Box container (destination) -->
+  <rect x="320" y="170" width="100" height="140" rx="14" stroke="white" stroke-width="10" fill="none"/>
+  
+  <!-- Barcode lines on box -->
+  <line x1="340" y1="200" x2="400" y2="200" stroke="white" stroke-width="6" stroke-linecap="round"/>
+  <line x1="340" y1="220" x2="400" y2="220" stroke="white" stroke-width="6" stroke-linecap="round"/>
+  <line x1="340" y1="240" x2="400" y2="240" stroke="white" stroke-width="6" stroke-linecap="round"/>
+  <line x1="340" y1="260" x2="400" y2="260" stroke="white" stroke-width="6" stroke-linecap="round"/>
+  <line x1="340" y1="280" x2="380" y2="280" stroke="white" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- SARDI text at bottom -->
+  <text x="256" y="420" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="white" text-anchor="middle">SARDI</text>
+</svg>
