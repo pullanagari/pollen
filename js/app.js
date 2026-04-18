@@ -22,6 +22,8 @@ const state = {
 // Scanner instances
 let sampleScanner = null;
 let boxScanner = null;
+let sampleScannerRunning = false;
+let boxScannerRunning = false;
 
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', () => {
@@ -103,12 +105,20 @@ function resetTransferState() {
 // ===== BARCODE SCANNING =====
 async function startSampleScanner() {
     // Stop any existing scanner first
-    if (sampleScanner) {
+    if (sampleScanner && sampleScannerRunning) {
         try {
             await sampleScanner.stop();
+            sampleScannerRunning = false;
+        } catch (err) {
+            // Ignore
+        }
+    }
+    
+    if (sampleScanner) {
+        try {
             sampleScanner.clear();
         } catch (err) {
-            // Ignore if already stopped
+            // Ignore
         }
         sampleScanner = null;
     }
@@ -138,8 +148,10 @@ async function startSampleScanner() {
                 // Ignore scan errors
             }
         );
+        sampleScannerRunning = true; // Mark as running
     } catch (err) {
         console.error('Error starting sample scanner:', err);
+        sampleScannerRunning = false;
         container.innerHTML = `
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
                 <p>Camera access required</p>
@@ -150,12 +162,20 @@ async function startSampleScanner() {
 }
 async function startBoxScanner() {
     // Stop any existing scanner first
-    if (boxScanner) {
+    if (boxScanner && boxScannerRunning) {
         try {
             await boxScanner.stop();
+            boxScannerRunning = false;
+        } catch (err) {
+            // Ignore
+        }
+    }
+    
+    if (boxScanner) {
+        try {
             boxScanner.clear();
         } catch (err) {
-            // Ignore if already stopped
+            // Ignore
         }
         boxScanner = null;
     }
@@ -185,8 +205,10 @@ async function startBoxScanner() {
                 // Ignore scan errors
             }
         );
+        boxScannerRunning = true; // Mark as running
     } catch (err) {
         console.error('Error starting box scanner:', err);
+        boxScannerRunning = false;
         container.innerHTML = `
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
                 <p>Camera access required</p>
@@ -197,23 +219,39 @@ async function startBoxScanner() {
 }
 async function stopAllScanners() {
     // Stop sample scanner
-    if (sampleScanner) {
+    if (sampleScanner && sampleScannerRunning) {
         try {
             await sampleScanner.stop();
+            sampleScannerRunning = false;
+        } catch (err) {
+            console.log('Sample scanner stop error (ignored):', err.message);
+        }
+    }
+    
+    if (sampleScanner) {
+        try {
             sampleScanner.clear();
         } catch (err) {
-            console.log('Sample scanner already stopped');
+            // Ignore
         }
         sampleScanner = null;
     }
     
     // Stop box scanner
-    if (boxScanner) {
+    if (boxScanner && boxScannerRunning) {
         try {
             await boxScanner.stop();
+            boxScannerRunning = false;
+        } catch (err) {
+            console.log('Box scanner stop error (ignored):', err.message);
+        }
+    }
+    
+    if (boxScanner) {
+        try {
             boxScanner.clear();
         } catch (err) {
-            console.log('Box scanner already stopped');
+            // Ignore
         }
         boxScanner = null;
     }
@@ -228,13 +266,21 @@ async function onSampleScanned(decodedText, decodedResult) {
     state.sampleId = decodedText;
     state.sampleType = getBarcodeType(decodedResult);
     
-    // Stop sample scanner and wait for it to complete
-    if (sampleScanner) {
+    // Stop sample scanner
+    if (sampleScanner && sampleScannerRunning) {
         try {
             await sampleScanner.stop();
+            sampleScannerRunning = false;
+        } catch (err) {
+            console.log('Scanner stop error (ignored)');
+        }
+    }
+    
+    if (sampleScanner) {
+        try {
             sampleScanner.clear();
         } catch (err) {
-            console.log('Scanner already stopped');
+            // Ignore
         }
         sampleScanner = null;
     }
