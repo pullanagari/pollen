@@ -13,7 +13,7 @@
 
 // ===== CONFIGURATION =====
 // Replace with your Google Sheet ID (from the URL)
-const SHEET_ID = '1EZHL7ZVMpYW1h430lBW3KfECcAc_kJMg-r6HZ4CyBdUE4prKyEWJwZcy';
+const SHEET_ID = 'YOUR_GOOGLE_SHEET_ID_HERE';
 const SHEET_NAME = 'Transfers';
 
 // ===== MAIN HANDLERS =====
