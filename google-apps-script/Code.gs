@@ -13,7 +13,7 @@
 
 // ===== CONFIGURATION =====
 // Replace with your Google Sheet ID (from the URL)
-const SHEET_ID = '1ey5lA3qI0TVx_QMs0LCQyct1pTLK7ZwWGccGTUze9xk';
+const SHEET_ID = '1EZHL7ZVMpYW1h430lBW3KfECcAc_kJMg-r6HZ4CyBdUE4prKyEWJwZcy';
 const SHEET_NAME = 'Pollen_SARDI';
 
 // ===== MAIN HANDLERS =====
