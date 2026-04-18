@@ -28,66 +28,6 @@ cd pollen-sardi-pwa
 
 Use an online PWA icon generator like [PWA Asset Generator](https://pwa-asset-generator.vercel.app/) or [Favicon.io](https://favicon.io/).
 
-Upload the `icons/icon.svg` file and generate these sizes for `/icons/` folder:
-- icon-72.png
-- icon-96.png
-- icon-128.png
-- icon-144.png
-- icon-152.png
-- icon-192.png
-- icon-384.png
-- icon-512.png
-
-### 3. Set Up Google Sheets Backend
-
-1. Create a new Google Sheet
-2. Copy the Sheet ID from the URL:
-   ```
-   https://docs.google.com/spreadsheets/d/[SHEET_ID_HERE]/edit
-   ```
-3. Go to [Google Apps Script](https://script.google.com)
-4. Create new project → Paste code from `google-apps-script/Code.gs`
-5. Replace `YOUR_GOOGLE_SHEET_ID_HERE` with your Sheet ID
-6. Deploy:
-   - Click **Deploy** → **New deployment**
-   - Type: **Web app**
-   - Execute as: **Me**
-   - Who has access: **Anyone**
-7. Copy the deployment URL
-
-### 4. Deploy the PWA
-
-**Option A: GitHub Pages (Free)**
-
-1. Go to repository Settings → Pages
-2. Source: Deploy from branch `main`
-3. Your app will be at: `https://pullanagari.github.io/pollen-sardi-pwa/`
-
-**Option B: Netlify (Free)**
-
-1. Connect your GitHub repo to [Netlify](https://netlify.com)
-2. Deploy with default settings
-3. Get your custom URL
-
-**Option C: Local Testing**
-
-```bash
-# Using Python
-python -m http.server 8000
-
-# Using Node.js
-npx serve .
-```
-
-Then open `http://localhost:8000`
-
-### 5. Configure the App
-
-1. Open the app on your phone
-2. Tap the ⚙️ Settings icon
-3. Paste your Google Apps Script URL
-4. Save
-
 ## Usage
 
 1. **Tap "Start Transfer"** on the home screen
@@ -173,12 +113,9 @@ The app creates a sheet with these columns:
 
 ## License
 
-Private - SARDI Research Use Only.
+Private 
 
-## Author
+## Author 
+Pullanagari
 
-SARDI - South Australian Research and Development Institute
 
----
-
-**Need help?** Open an issue in this repository.
