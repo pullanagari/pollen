@@ -71,18 +71,17 @@ function goHome() {
     resetTransferState();
 }
 
-function goBackToSampleScan() {
-    stopAllScanners();
+async function goBackToSampleScan() {
+    await stopAllScanners();
     state.boxId = null;
     state.boxType = null;
     showScreen('scan-sample');
-    startSampleScanner();
+    await startSampleScanner();
 }
-
-function goBackToBoxScan() {
-    stopAllScanners();
+async function goBackToBoxScan() {
+    await stopAllScanners();
     showScreen('scan-box');
-    startBoxScanner();
+    await startBoxScanner();
 }
 
 // ===== TRANSFER WORKFLOW =====
@@ -102,9 +101,23 @@ function resetTransferState() {
 }
 
 // ===== BARCODE SCANNING =====
-function startSampleScanner() {
+async function startSampleScanner() {
+    // Stop any existing scanner first
+    if (sampleScanner) {
+        try {
+            await sampleScanner.stop();
+            sampleScanner.clear();
+        } catch (err) {
+            // Ignore if already stopped
+        }
+        sampleScanner = null;
+    }
+    
     const container = document.getElementById('scanner-sample');
     container.innerHTML = '';
+    
+    // Wait a bit for cleanup
+    await new Promise(resolve => setTimeout(resolve, 100));
     
     sampleScanner = new Html5Qrcode('scanner-sample');
     
@@ -114,16 +127,18 @@ function startSampleScanner() {
         aspectRatio: 1.333
     };
     
-    sampleScanner.start(
-        { facingMode: 'environment' },
-        config,
-        (decodedText, decodedResult) => {
-            onSampleScanned(decodedText, decodedResult);
-        },
-        (errorMessage) => {
-            // Ignore scan errors
-        }
-    ).catch(err => {
+    try {
+        await sampleScanner.start(
+            { facingMode: 'environment' },
+            config,
+            (decodedText, decodedResult) => {
+                onSampleScanned(decodedText, decodedResult);
+            },
+            (errorMessage) => {
+                // Ignore scan errors
+            }
+        );
+    } catch (err) {
         console.error('Error starting sample scanner:', err);
         container.innerHTML = `
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
@@ -131,12 +146,25 @@ function startSampleScanner() {
                 <p style="font-size:0.875rem;opacity:0.7;margin-top:8px;">Please allow camera permissions</p>
             </div>
         `;
-    });
+    }
 }
-
-function startBoxScanner() {
+async function startBoxScanner() {
+    // Stop any existing scanner first
+    if (boxScanner) {
+        try {
+            await boxScanner.stop();
+            boxScanner.clear();
+        } catch (err) {
+            // Ignore if already stopped
+        }
+        boxScanner = null;
+    }
+    
     const container = document.getElementById('scanner-box');
     container.innerHTML = '';
+    
+    // Wait a bit for cleanup
+    await new Promise(resolve => setTimeout(resolve, 100));
     
     boxScanner = new Html5Qrcode('scanner-box');
     
@@ -146,16 +174,18 @@ function startBoxScanner() {
         aspectRatio: 1.333
     };
     
-    boxScanner.start(
-        { facingMode: 'environment' },
-        config,
-        (decodedText, decodedResult) => {
-            onBoxScanned(decodedText, decodedResult);
-        },
-        (errorMessage) => {
-            // Ignore scan errors
-        }
-    ).catch(err => {
+    try {
+        await boxScanner.start(
+            { facingMode: 'environment' },
+            config,
+            (decodedText, decodedResult) => {
+                onBoxScanned(decodedText, decodedResult);
+            },
+            (errorMessage) => {
+                // Ignore scan errors
+            }
+        );
+    } catch (err) {
         console.error('Error starting box scanner:', err);
         container.innerHTML = `
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
@@ -163,21 +193,33 @@ function startBoxScanner() {
                 <p style="font-size:0.875rem;opacity:0.7;margin-top:8px;">Please allow camera permissions</p>
             </div>
         `;
-    });
+    }
 }
-
-function stopAllScanners() {
+async function stopAllScanners() {
+    // Stop sample scanner
     if (sampleScanner) {
-        sampleScanner.stop().catch(() => {});
+        try {
+            await sampleScanner.stop();
+            sampleScanner.clear();
+        } catch (err) {
+            console.log('Sample scanner already stopped');
+        }
         sampleScanner = null;
     }
+    
+    // Stop box scanner
     if (boxScanner) {
-        boxScanner.stop().catch(() => {});
+        try {
+            await boxScanner.stop();
+            boxScanner.clear();
+        } catch (err) {
+            console.log('Box scanner already stopped');
+        }
         boxScanner = null;
     }
 }
 
-function onSampleScanned(decodedText, decodedResult) {
+async function onSampleScanned(decodedText, decodedResult) {
     // Vibrate for feedback
     if (navigator.vibrate) {
         navigator.vibrate(100);
@@ -186,18 +228,28 @@ function onSampleScanned(decodedText, decodedResult) {
     state.sampleId = decodedText;
     state.sampleType = getBarcodeType(decodedResult);
     
-    // Stop sample scanner
+    // Stop sample scanner and wait for it to complete
     if (sampleScanner) {
-        sampleScanner.stop().catch(() => {});
+        try {
+            await sampleScanner.stop();
+            sampleScanner.clear();
+        } catch (err) {
+            console.log('Scanner already stopped');
+        }
+        sampleScanner = null;
     }
+    
+    // Wait a moment for cleanup
+    await new Promise(resolve => setTimeout(resolve, 200));
     
     // Update UI and move to box scan
     document.getElementById('captured-sample-id').textContent = truncateText(state.sampleId, 15);
     showScreen('scan-box');
-    startBoxScanner();
+    
+    // Start box scanner
+    await startBoxScanner();
 }
-
-function onBoxScanned(decodedText, decodedResult) {
+async function onBoxScanned(decodedText, decodedResult) {
     // Vibrate for feedback
     if (navigator.vibrate) {
         navigator.vibrate(100);
@@ -207,12 +259,11 @@ function onBoxScanned(decodedText, decodedResult) {
     state.boxType = getBarcodeType(decodedResult);
     
     // Stop box scanner
-    stopAllScanners();
+    await stopAllScanners();
     
     // Move to review screen
     showReviewScreen();
 }
-
 function getBarcodeType(decodedResult) {
     if (decodedResult && decodedResult.result && decodedResult.result.format) {
         const format = decodedResult.result.format.formatName;
