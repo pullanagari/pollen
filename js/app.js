@@ -130,31 +130,32 @@ async function startSampleScanner() {
     
     sampleScanner = new Html5Qrcode('scanner-sample');
     
-    // OPTIMIZED FOR CYLINDRICAL TUBES
+    // BALANCED CONFIG - Fast for flat barcodes, still works for tubes
     const config = {
-        fps: 30, // High frame rate for better chances
+        fps: 30, // High frame rate
         
-        // CRITICAL: Smaller, wider scan area for tubes
+        // BALANCED: Larger scan area, but wider than tall
         qrbox: function(viewfinderWidth, viewfinderHeight) {
-            // Make scan area MUCH smaller and wider
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            // 60% of screen - bigger than my previous 280x100, smaller than original 70%
+            const size = Math.floor(minEdge * 0.6);
             return {
-                width: 280,  // Fixed width - wider for horizontal barcodes
-                height: 100  // Much shorter - helps with curved surfaces
+                width: size,           // Square-ish but...
+                height: Math.floor(size * 0.7)  // ...shorter (1:0.7 ratio)
             };
         },
         
-        aspectRatio: 2.8, // Wider ratio for tube barcodes
         disableFlip: false,
         
-        // Focus on 1D barcodes common on tubes
+        // All formats for flexibility
         formatsToSupport: [
-            Html5QrcodeSupportedFormats.CODE_128,    // Most common on lab tubes
-            Html5QrcodeSupportedFormats.CODE_39,     // Also common
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.QR_CODE,
             Html5QrcodeSupportedFormats.EAN_13,
             Html5QrcodeSupportedFormats.EAN_8,
             Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.DATA_MATRIX,
-            Html5QrcodeSupportedFormats.QR_CODE      // Keep QR support
+            Html5QrcodeSupportedFormats.DATA_MATRIX
         ]
     };
     
@@ -171,7 +172,7 @@ async function startSampleScanner() {
         );
         
         sampleScannerRunning = true;
-        console.log('Sample scanner started - optimized for tubes');
+        console.log('Sample scanner started');
         
     } catch (err) {
         console.error('Scanner start error:', err);
@@ -241,29 +242,29 @@ async function startBoxScanner() {
     
     boxScanner = new Html5Qrcode('scanner-box');
     
-    // OPTIMIZED FOR CYLINDRICAL TUBES
+    // BALANCED CONFIG - Fast for flat barcodes, still works for tubes
     const config = {
         fps: 30,
         
-        // CRITICAL: Smaller, wider scan area
         qrbox: function(viewfinderWidth, viewfinderHeight) {
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            const size = Math.floor(minEdge * 0.6);
             return {
-                width: 280,  // Fixed width - wider
-                height: 100  // Much shorter
+                width: size,
+                height: Math.floor(size * 0.7)
             };
         },
         
-        aspectRatio: 2.8,
         disableFlip: false,
         
         formatsToSupport: [
             Html5QrcodeSupportedFormats.CODE_128,
             Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.QR_CODE,
             Html5QrcodeSupportedFormats.EAN_13,
             Html5QrcodeSupportedFormats.EAN_8,
             Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.DATA_MATRIX,
-            Html5QrcodeSupportedFormats.QR_CODE
+            Html5QrcodeSupportedFormats.DATA_MATRIX
         ]
     };
     
@@ -280,7 +281,7 @@ async function startBoxScanner() {
         );
         
         boxScannerRunning = true;
-        console.log('Box scanner started - optimized for tubes');
+        console.log('Box scanner started');
         
     } catch (err) {
         console.error('Scanner start error:', err);
