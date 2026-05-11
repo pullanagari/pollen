@@ -12,10 +12,7 @@ const STATIC_ASSETS = [
     '/css/styles.css',
     '/js/app.js',
     '/manifest.json',
-    '/icons/icon-192.png',
-    '/icons/icon-512.png',
-    'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
-    'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap'
+    '/icon.svg'
 ];
 
 // Install event - cache static assets
