@@ -109,12 +109,12 @@ function resetTransferState() {
 // ===== TUBE-OPTIMIZED SCANNER =====
 
 // SAMPLE SCANNER - Optimized for curved tubes
-// SAMPLE SCANNER - FIXED camera constraints
-// ===== SAMPLE SCANNER - WORKING VERSION =====
+// ===== BARCODE SCANNING =====
+
+// SAMPLE SCANNER
 async function startSampleScanner() {
     console.log('Starting sample scanner...');
     
-    // Stop any existing scanner
     if (sampleScanner && sampleScannerRunning) {
         try {
             await sampleScanner.stop();
@@ -133,12 +133,10 @@ async function startSampleScanner() {
     
     const container = document.getElementById('scanner-sample');
     container.innerHTML = '';
-    
     await new Promise(resolve => setTimeout(resolve, 200));
     
     sampleScanner = new Html5Qrcode('scanner-sample');
     
-    // SIMPLE CONFIG - NO ADVANCED CONSTRAINTS
     const config = {
         fps: 30,
         qrbox: function(viewfinderWidth, viewfinderHeight) {
@@ -150,7 +148,6 @@ async function startSampleScanner() {
     };
     
     try {
-        // CRITICAL: ONLY pass facingMode - nothing else!
         await sampleScanner.start(
             { facingMode: 'environment' },
             config,
@@ -171,22 +168,17 @@ async function startSampleScanner() {
                 <p style="font-size:18px;font-weight:600;">📷 Camera Error</p>
                 <p style="font-size:14px;margin-top:8px;">Please allow camera permissions</p>
                 <p style="font-size:12px;opacity:0.7;margin-top:8px;">${err.message}</p>
-                <button onclick="startSampleScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">
-                    Try Again
-                </button>
-                <button onclick="showManualEntry('sample')" style="margin-top:8px;padding:10px 20px;background:#64748b;border:none;border-radius:8px;color:white;cursor:pointer;">
-                    Enter Manually
-                </button>
+                <button onclick="startSampleScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">Try Again</button>
+                <button onclick="showManualEntry('sample')" style="margin-top:8px;padding:10px 20px;background:#64748b;border:none;border-radius:8px;color:white;cursor:pointer;">Enter Manually</button>
             </div>
         `;
     }
 }
 
-// ===== BOX SCANNER - WORKING VERSION =====
+// BOX SCANNER
 async function startBoxScanner() {
     console.log('Starting box scanner...');
     
-    // Stop any existing scanner
     if (boxScanner && boxScannerRunning) {
         try {
             await boxScanner.stop();
@@ -205,7 +197,6 @@ async function startBoxScanner() {
     
     const container = document.getElementById('scanner-box');
     container.innerHTML = '';
-    
     await new Promise(resolve => setTimeout(resolve, 200));
     
     boxScanner = new Html5Qrcode('scanner-box');
@@ -221,7 +212,6 @@ async function startBoxScanner() {
     };
     
     try {
-        // CRITICAL: ONLY pass facingMode
         await boxScanner.start(
             { facingMode: 'environment' },
             config,
@@ -242,19 +232,15 @@ async function startBoxScanner() {
                 <p style="font-size:18px;font-weight:600;">📷 Camera Error</p>
                 <p style="font-size:14px;margin-top:8px;">Please allow camera permissions</p>
                 <p style="font-size:12px;opacity:0.7;margin-top:8px;">${err.message}</p>
-                <button onclick="startBoxScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">
-                    Try Again
-                </button>
-                <button onclick="showManualEntry('box')" style="margin-top:8px;padding:10px 20px;background:#64748b;border:none;border-radius:8px;color:white;cursor:pointer;">
-                    Enter Manually
-                </button>
+                <button onclick="startBoxScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">Try Again</button>
+                <button onclick="showManualEntry('box')" style="margin-top:8px;padding:10px 20px;background:#64748b;border:none;border-radius:8px;color:white;cursor:pointer;">Enter Manually</button>
             </div>
         `;
     }
 }
+
 // STOP ALL SCANNERS
 async function stopAllScanners() {
-    // Stop sample scanner
     if (sampleScanner && sampleScannerRunning) {
         try {
             await sampleScanner.stop();
@@ -267,13 +253,10 @@ async function stopAllScanners() {
     if (sampleScanner) {
         try {
             sampleScanner.clear();
-        } catch (err) {
-            console.log('Sample scanner clear error (ignored)');
-        }
+        } catch (err) {}
         sampleScanner = null;
     }
     
-    // Stop box scanner
     if (boxScanner && boxScannerRunning) {
         try {
             await boxScanner.stop();
@@ -286,16 +269,13 @@ async function stopAllScanners() {
     if (boxScanner) {
         try {
             boxScanner.clear();
-        } catch (err) {
-            console.log('Box scanner clear error (ignored)');
-        }
+        } catch (err) {}
         boxScanner = null;
     }
 }
 
 // SCAN CALLBACKS
 async function onSampleScanned(decodedText, decodedResult) {
-    // Vibrate for feedback
     if (navigator.vibrate) {
         navigator.vibrate(100);
     }
@@ -303,22 +283,16 @@ async function onSampleScanned(decodedText, decodedResult) {
     state.sampleId = decodedText;
     state.sampleType = getBarcodeType(decodedResult);
     
-    // Stop sample scanner
     await stopAllScanners();
-    
-    // Wait a moment for cleanup
     await new Promise(resolve => setTimeout(resolve, 200));
     
-    // Update UI and move to box scan
     document.getElementById('captured-sample-id').textContent = truncateText(state.sampleId, 15);
     showScreen('scan-box');
     
-    // Start box scanner
     setTimeout(() => startBoxScanner(), 300);
 }
 
 async function onBoxScanned(decodedText, decodedResult) {
-    // Vibrate for feedback
     if (navigator.vibrate) {
         navigator.vibrate(100);
     }
@@ -326,10 +300,8 @@ async function onBoxScanned(decodedText, decodedResult) {
     state.boxId = decodedText;
     state.boxType = getBarcodeType(decodedResult);
     
-    // Stop box scanner
     await stopAllScanners();
     
-    // Move to review screen
     setTimeout(() => showReviewScreen(), 200);
 }
 
@@ -340,6 +312,7 @@ function getBarcodeType(decodedResult) {
     }
     return 'Unknown';
 }
+
 
 // ===== MANUAL ENTRY =====
 function showManualEntry(target) {
