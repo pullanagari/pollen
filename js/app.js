@@ -106,8 +106,11 @@ function resetTransferState() {
 // ===== BARCODE SCANNING =====
 
 // SAMPLE SCANNER
+// ===== TUBE-OPTIMIZED SCANNER =====
+
+// SAMPLE SCANNER - Optimized for curved tubes
 async function startSampleScanner() {
-    console.log('Starting sample scanner...');
+    console.log('Starting sample scanner (tube-optimized)...');
     
     // Stop any existing scanner
     if (sampleScanner && sampleScannerRunning) {
@@ -136,15 +139,44 @@ async function startSampleScanner() {
     
     sampleScanner = new Html5Qrcode('scanner-sample');
     
+    // TUBE-OPTIMIZED CONFIG
     const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 150 },
-        aspectRatio: 1.667
+        fps: 30,  // Higher FPS for better tube detection
+        
+        // CRITICAL: Wider, shorter box for horizontal tube barcodes
+        qrbox: function(viewfinderWidth, viewfinderHeight) {
+            // Make scan area much wider and shorter
+            const width = Math.min(viewfinderWidth * 0.85, 320);
+            const height = Math.floor(width * 0.35);  // Very wide ratio
+            return { width: width, height: height };
+        },
+        
+        // Focus on 1D barcodes (tubes typically use CODE_128 or CODE_39)
+        formatsToSupport: [
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.CODE_93,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.QR_CODE
+        ],
+        
+        disableFlip: false,
+        aspectRatio: 2.8  // Wide aspect for tubes
     };
     
     try {
         await sampleScanner.start(
-            { facingMode: 'environment' },
+            { 
+                facingMode: 'environment',
+                // Request higher resolution for better tube scanning
+                advanced: [
+                    { width: { min: 640, ideal: 1280 } },
+                    { height: { min: 480, ideal: 720 } }
+                ]
+            },
             config,
             (decodedText, decodedResult) => {
                 console.log('Sample scanned:', decodedText);
@@ -156,7 +188,7 @@ async function startSampleScanner() {
         );
         
         sampleScannerRunning = true;
-        console.log('Sample scanner started successfully');
+        console.log('Sample scanner started (tube mode)');
         
     } catch (err) {
         console.error('Error starting sample scanner:', err);
@@ -169,14 +201,17 @@ async function startSampleScanner() {
                 <button onclick="startSampleScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">
                     Try Again
                 </button>
+                <button onclick="showManualEntry('sample')" style="margin-top:8px;padding:10px 20px;background:#64748b;border:none;border-radius:8px;color:white;cursor:pointer;">
+                    Enter Manually
+                </button>
             </div>
         `;
     }
 }
 
-// BOX SCANNER
+// BOX SCANNER - Also optimized for tubes
 async function startBoxScanner() {
-    console.log('Starting box scanner...');
+    console.log('Starting box scanner (tube-optimized)...');
     
     // Stop any existing scanner
     if (boxScanner && boxScannerRunning) {
@@ -205,15 +240,40 @@ async function startBoxScanner() {
     
     boxScanner = new Html5Qrcode('scanner-box');
     
+    // TUBE-OPTIMIZED CONFIG
     const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 150 },
-        aspectRatio: 1.667
+        fps: 30,
+        
+        qrbox: function(viewfinderWidth, viewfinderHeight) {
+            const width = Math.min(viewfinderWidth * 0.85, 320);
+            const height = Math.floor(width * 0.35);
+            return { width: width, height: height };
+        },
+        
+        formatsToSupport: [
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.CODE_93,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.QR_CODE
+        ],
+        
+        disableFlip: false,
+        aspectRatio: 2.8
     };
     
     try {
         await boxScanner.start(
-            { facingMode: 'environment' },
+            { 
+                facingMode: 'environment',
+                advanced: [
+                    { width: { min: 640, ideal: 1280 } },
+                    { height: { min: 480, ideal: 720 } }
+                ]
+            },
             config,
             (decodedText, decodedResult) => {
                 console.log('Box scanned:', decodedText);
@@ -225,7 +285,7 @@ async function startBoxScanner() {
         );
         
         boxScannerRunning = true;
-        console.log('Box scanner started successfully');
+        console.log('Box scanner started (tube mode)');
         
     } catch (err) {
         console.error('Error starting box scanner:', err);
@@ -238,11 +298,13 @@ async function startBoxScanner() {
                 <button onclick="startBoxScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">
                     Try Again
                 </button>
+                <button onclick="showManualEntry('box')" style="margin-top:8px;padding:10px 20px;background:#64748b;border:none;border-radius:8px;color:white;cursor:pointer;">
+                    Enter Manually
+                </button>
             </div>
         `;
     }
 }
-
 // STOP ALL SCANNERS
 async function stopAllScanners() {
     // Stop sample scanner
