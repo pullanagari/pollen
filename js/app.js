@@ -104,126 +104,59 @@ function resetTransferState() {
 
 // ===== BARCODE SCANNING =====
 async function startSampleScanner() {
-    // Stop any existing scanner
-    if (sampleScanner && sampleScannerRunning) {
-        try {
-            await sampleScanner.stop();
-            sampleScannerRunning = false;
-        } catch (err) {
-            // Ignore
-        }
-    }
-    
     if (sampleScanner) {
-        try {
-            sampleScanner.clear();
-        } catch (err) {
-            // Ignore
-        }
+        try { await sampleScanner.stop(); } catch(e) {}
+        try { sampleScanner.clear(); } catch(e) {}
         sampleScanner = null;
     }
     
     const container = document.getElementById('scanner-sample');
     container.innerHTML = '';
-    
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
     sampleScanner = new Html5Qrcode('scanner-sample');
     
-    const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 150 },
-        aspectRatio: 1.333
-    };
-    
-    try {
-        await sampleScanner.start(
-            { facingMode: 'environment' },
-            config,
-            (decodedText, decodedResult) => {
-                onSampleScanned(decodedText, decodedResult);
-            },
-            (errorMessage) => {
-                // Ignore scan errors
-            }
-        );
-        
+    sampleScanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: 250 },
+        (decodedText, decodedResult) => {
+            onSampleScanned(decodedText, decodedResult);
+        }
+    ).then(() => {
         sampleScannerRunning = true;
-        console.log('Sample scanner started');
-        
-    } catch (err) {
-        console.error('Error starting sample scanner:', err);
-        container.innerHTML = `
-            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
-                <p>Camera access required</p>
-                <p style="font-size:0.875rem;opacity:0.7;margin-top:8px;">Please allow camera permissions</p>
-                <button onclick="startSampleScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">
-                    Try Again
-                </button>
-            </div>
-        `;
-    }
+    }).catch(err => {
+        console.error('Scanner error:', err);
+        container.innerHTML = `<div style="color:white;text-align:center;padding:40px;">
+            <p>Camera Error</p>
+            <button onclick="startSampleScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;">Retry</button>
+        </div>`;
+    });
 }
+
 async function startBoxScanner() {
-    // Stop any existing scanner
-    if (boxScanner && boxScannerRunning) {
-        try {
-            await boxScanner.stop();
-            boxScannerRunning = false;
-        } catch (err) {
-            // Ignore
-        }
-    }
-    
     if (boxScanner) {
-        try {
-            boxScanner.clear();
-        } catch (err) {
-            // Ignore
-        }
+        try { await boxScanner.stop(); } catch(e) {}
+        try { boxScanner.clear(); } catch(e) {}
         boxScanner = null;
     }
     
     const container = document.getElementById('scanner-box');
     container.innerHTML = '';
-    
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
     boxScanner = new Html5Qrcode('scanner-box');
     
-    const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 150 },
-        aspectRatio: 1.333
-    };
-    
-    try {
-        await boxScanner.start(
-            { facingMode: 'environment' },
-            config,
-            (decodedText, decodedResult) => {
-                onBoxScanned(decodedText, decodedResult);
-            },
-            (errorMessage) => {
-                // Ignore scan errors
-            }
-        );
-        
+    boxScanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: 250 },
+        (decodedText, decodedResult) => {
+            onBoxScanned(decodedText, decodedResult);
+        }
+    ).then(() => {
         boxScannerRunning = true;
-        console.log('Box scanner started');
-        
-    } catch (err) {
-        console.error('Error starting box scanner:', err);
-        container.innerHTML = `
-            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
-                <p>Camera access required</p>
-                <p style="font-size:0.875rem;opacity:0.7;margin-top:8px;">Please allow camera permissions</p>
-                <button onclick="startBoxScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">
-                    Try Again
-                </button>
-            </div>
-        `;
-    }
+    }).catch(err => {
+        console.error('Scanner error:', err);
+        container.innerHTML = `<div style="color:white;text-align:center;padding:40px;">
+            <p>Camera Error</p>
+            <button onclick="startBoxScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;">Retry</button>
+        </div>`;
+    });
 }
 // Add after the scanner initialization functions
 async function enableTorchIfAvailable(scanner, scannerType) {
