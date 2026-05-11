@@ -130,35 +130,37 @@ async function startSampleScanner() {
     
     sampleScanner = new Html5Qrcode('scanner-sample');
     
-    // FIXED: Simplified config
+    // OPTIMIZED FOR CYLINDRICAL TUBES
     const config = {
-        fps: 30,
+        fps: 30, // High frame rate for better chances
+        
+        // CRITICAL: Smaller, wider scan area for tubes
         qrbox: function(viewfinderWidth, viewfinderHeight) {
-            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            const qrboxSize = Math.floor(minEdge * 0.7);
+            // Make scan area MUCH smaller and wider
             return {
-                width: qrboxSize,
-                height: Math.floor(qrboxSize * 0.5)
+                width: 280,  // Fixed width - wider for horizontal barcodes
+                height: 100  // Much shorter - helps with curved surfaces
             };
         },
-        aspectRatio: 1.777778,
+        
+        aspectRatio: 2.8, // Wider ratio for tube barcodes
         disableFlip: false,
+        
+        // Focus on 1D barcodes common on tubes
         formatsToSupport: [
-            Html5QrcodeSupportedFormats.QR_CODE,
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.CODE_128,    // Most common on lab tubes
+            Html5QrcodeSupportedFormats.CODE_39,     // Also common
             Html5QrcodeSupportedFormats.EAN_13,
             Html5QrcodeSupportedFormats.EAN_8,
             Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E,
-            Html5QrcodeSupportedFormats.DATA_MATRIX
+            Html5QrcodeSupportedFormats.DATA_MATRIX,
+            Html5QrcodeSupportedFormats.QR_CODE      // Keep QR support
         ]
     };
     
     try {
-        // FIXED: Simple camera config with only 1 key
         await sampleScanner.start(
-            { facingMode: "environment" },  // ← Only 1 key!
+            { facingMode: "environment" },
             config,
             (decodedText, decodedResult) => {
                 onSampleScanned(decodedText, decodedResult);
@@ -169,13 +171,12 @@ async function startSampleScanner() {
         );
         
         sampleScannerRunning = true;
-        console.log('Sample scanner started successfully');
+        console.log('Sample scanner started - optimized for tubes');
         
     } catch (err) {
         console.error('Scanner start error:', err);
         sampleScannerRunning = false;
         
-        // Show detailed error message
         let errorMsg = 'Camera access denied or unavailable';
         let instructions = '';
         
@@ -240,35 +241,35 @@ async function startBoxScanner() {
     
     boxScanner = new Html5Qrcode('scanner-box');
     
-    // FIXED: Simplified config
+    // OPTIMIZED FOR CYLINDRICAL TUBES
     const config = {
         fps: 30,
+        
+        // CRITICAL: Smaller, wider scan area
         qrbox: function(viewfinderWidth, viewfinderHeight) {
-            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            const qrboxSize = Math.floor(minEdge * 0.7);
             return {
-                width: qrboxSize,
-                height: Math.floor(qrboxSize * 0.5)
+                width: 280,  // Fixed width - wider
+                height: 100  // Much shorter
             };
         },
-        aspectRatio: 1.777778,
+        
+        aspectRatio: 2.8,
         disableFlip: false,
+        
         formatsToSupport: [
-            Html5QrcodeSupportedFormats.QR_CODE,
             Html5QrcodeSupportedFormats.CODE_128,
             Html5QrcodeSupportedFormats.CODE_39,
             Html5QrcodeSupportedFormats.EAN_13,
             Html5QrcodeSupportedFormats.EAN_8,
             Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E,
-            Html5QrcodeSupportedFormats.DATA_MATRIX
+            Html5QrcodeSupportedFormats.DATA_MATRIX,
+            Html5QrcodeSupportedFormats.QR_CODE
         ]
     };
     
     try {
-        // FIXED: Simple camera config with only 1 key
         await boxScanner.start(
-            { facingMode: "environment" },  // ← Only 1 key!
+            { facingMode: "environment" },
             config,
             (decodedText, decodedResult) => {
                 onBoxScanned(decodedText, decodedResult);
@@ -279,7 +280,7 @@ async function startBoxScanner() {
         );
         
         boxScannerRunning = true;
-        console.log('Box scanner started successfully');
+        console.log('Box scanner started - optimized for tubes');
         
     } catch (err) {
         console.error('Scanner start error:', err);
