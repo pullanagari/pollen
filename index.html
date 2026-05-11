@@ -117,6 +117,7 @@
         </div>
 
         <!-- SCAN SAMPLE SCREEN -->
+        <!-- SCAN SAMPLE SCREEN -->
         <div id="screen-scan-sample" class="screen">
             <header class="header">
                 <button class="btn-icon" onclick="goHome()">
@@ -131,11 +132,18 @@
             <main class="scan-content">
                 <div class="scan-instruction sample">
                     <div class="scan-icon">🧪</div>
-                    <h2>Scan SAMPLE</h2>
-                    <p>Position barcode in center of frame</p>
+                    <h2>Scan SAMPLE Tube</h2>
+                    <p style="font-size:13px;margin-top:4px;">Lay tube FLAT, barcode facing up</p>
                 </div>
                 
                 <div id="scanner-sample" class="scanner-container"></div>
+                
+                <!-- ADD THIS: Tube scanning guide -->
+                <div class="tube-guide">
+                    <p>📏 Hold phone 3-4 inches above tube</p>
+                    <p>📐 Keep phone parallel to table</p>
+                    <p>🔄 Slowly rotate tube if not scanning</p>
+                </div>
                 
                 <div class="manual-entry">
                     <button class="btn-text" onclick="showManualEntry('sample')">
