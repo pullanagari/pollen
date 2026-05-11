@@ -186,18 +186,21 @@ function startTubeScanner(targetElementId, onDetectedCallback) {
     });
 }
 let codeReader = null;
+let scanInterval = null;
 
 function startSampleScanner() {
 
-    console.log("Starting ZXing scanner...");
+    console.log("Starting enhanced tube scanner...");
 
     const container = document.getElementById("scanner-sample");
 
     container.innerHTML = `
-        <video id="video" style="width:100%;height:100%;object-fit:cover;"></video>
+        <video id="video" autoplay playsinline></video>
+        <canvas id="scanCanvas" style="display:none;"></canvas>
     `;
 
-    const videoElement = document.getElementById("video");
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("scanCanvas");
 
     codeReader = new ZXing.BrowserMultiFormatReader();
 
@@ -206,32 +209,47 @@ function startSampleScanner() {
 
     codeReader.decodeFromVideoDevice(
         null,
-        videoElement,
-        (result, err) => {
+        video,
+        () => {}
+    ).then(() => {
 
-            if (result) {
+        // 🔥 CONTROLLED LOOP (IMPORTANT)
+        scanInterval = setInterval(() => {
 
-                const code = result.getText();
+            if (!video.videoWidth) return;
 
-                // 🔥 stability logic (IMPORTANT for tubes)
-                if (code === lastCode) {
-                    stableCount++;
+            enhanceFrame(video, canvas); // OPEN-CV preprocessing
 
-                    if (stableCount >= 3) {
-                        console.log("FINAL CODE:", code);
+            const tempReader = new ZXing.BrowserMultiFormatReader();
 
-                        onSampleScanned(code);
+            tempReader.decodeFromCanvas(canvas)
+                .then(result => {
 
-                        codeReader.reset();
+                    const code = result.getText();
+
+                    if (code === lastCode) {
+                        stableCount++;
+
+                        if (stableCount >= 3) {
+
+                            console.log("FINAL TUBE CODE:", code);
+
+                            clearInterval(scanInterval);
+
+                            onSampleScanned(code);
+                        }
+
+                    } else {
+                        lastCode = code;
+                        stableCount = 0;
                     }
 
-                } else {
-                    lastCode = code;
-                    stableCount = 0;
-                }
-            }
-        }
-    );
+                })
+                .catch(() => {});
+
+        }, 150); // 6–7 FPS scanning (IMPORTANT)
+
+    });
 }
 // BOX SCANNER
 function startBoxScanner() {
@@ -319,14 +337,11 @@ function enhanceFrame(video, canvas) {
     let gray = new cv.Mat();
     let enhanced = new cv.Mat();
 
-    // grayscale
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
-    // CLAHE (contrast enhancement)
     let clahe = new cv.CLAHE(2.0, new cv.Size(8, 8));
     clahe.apply(gray, enhanced);
 
-    // slight sharpening (kernel)
     let kernel = cv.matFromArray(3, 3, cv.CV_32F, [
         0, -1, 0,
         -1, 5, -1,
@@ -337,9 +352,12 @@ function enhanceFrame(video, canvas) {
 
     cv.imshow(canvas, enhanced);
 
+    // cleanup (IMPORTANT)
     src.delete();
     gray.delete();
     enhanced.delete();
+    clahe.delete();
+    kernel.delete();
 }
 // STOP ALL SCANNERS
 async function stopAllScanners() {
