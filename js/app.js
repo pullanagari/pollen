@@ -105,125 +105,200 @@ function resetTransferState() {
 // ===== BARCODE SCANNING =====
 async function startSampleScanner() {
     // Stop any existing scanner
-    if (sampleScanner && sampleScannerRunning) {
-        try {
-            await sampleScanner.stop();
-            sampleScannerRunning = false;
-        } catch (err) {
-            // Ignore
-        }
-    }
-    
     if (sampleScanner) {
         try {
-            sampleScanner.clear();
+            await Quagga.stop();
+            sampleScanner = null;
+            sampleScannerRunning = false;
         } catch (err) {
-            // Ignore
+            console.log('Stop error ignored');
         }
-        sampleScanner = null;
     }
     
     const container = document.getElementById('scanner-sample');
-    container.innerHTML = '';
+    container.innerHTML = '<div id="quagga-sample" style="position:relative;width:100%;height:100%;"></div>';
     
     await new Promise(resolve => setTimeout(resolve, 100));
     
-    sampleScanner = new Html5Qrcode('scanner-sample');
-    
-    const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 150 },
-        aspectRatio: 1.333
-    };
-    
-    try {
-        await sampleScanner.start(
-            { facingMode: 'environment' },
-            config,
-            (decodedText, decodedResult) => {
-                onSampleScanned(decodedText, decodedResult);
+    // Quagga2 configuration - optimized for tubes
+    Quagga.init({
+        inputStream: {
+            name: "Live",
+            type: "LiveStream",
+            target: document.querySelector('#quagga-sample'),
+            constraints: {
+                facingMode: "environment",
+                aspectRatio: { min: 1, max: 2 }
             },
-            (errorMessage) => {
-                // Ignore scan errors
+            area: { // Only scan the center area
+                top: "20%",
+                right: "10%",
+                left: "10%",
+                bottom: "20%"
             }
-        );
+        },
+        locator: {
+            patchSize: "medium",
+            halfSample: true
+        },
+        numOfWorkers: 4, // Multi-threaded processing
+        frequency: 10,
+        decoder: {
+            readers: [
+                "code_128_reader",  // Most common on lab tubes
+                "code_39_reader",   // Also common
+                "ean_reader",
+                "ean_8_reader",
+                "code_39_vin_reader",
+                "upc_reader",
+                "upc_e_reader"
+            ],
+            multiple: false
+        },
+        locate: true
+    }, function(err) {
+        if (err) {
+            console.error('Quagga init error:', err);
+            container.innerHTML = `
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:30px;text-align:center;">
+                    <p style="font-size:18px;font-weight:600;">📷 Camera Error</p>
+                    <p style="font-size:14px;margin-top:12px;">Please allow camera permissions</p>
+                    <button onclick="startSampleScanner()" style="margin-top:20px;padding:12px 24px;background:#0d9488;border:none;border-radius:8px;color:white;font-size:14px;cursor:pointer;">
+                        🔄 Try Again
+                    </button>
+                    <button onclick="showManualEntry('sample')" style="margin-top:8px;padding:12px 24px;background:#64748b;border:none;border-radius:8px;color:white;font-size:14px;cursor:pointer;">
+                        ⌨️ Enter Manually
+                    </button>
+                </div>
+            `;
+            return;
+        }
         
+        console.log("Sample scanner initialized");
+        Quagga.start();
         sampleScannerRunning = true;
-        console.log('Sample scanner started');
+        sampleScanner = true; // Just a flag
         
-    } catch (err) {
-        console.error('Error starting sample scanner:', err);
-        container.innerHTML = `
-            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
-                <p>Camera access required</p>
-                <p style="font-size:0.875rem;opacity:0.7;margin-top:8px;">Please allow camera permissions</p>
-                <button onclick="startSampleScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">
-                    Try Again
-                </button>
-            </div>
-        `;
-    }
+        // Remove previous listener if exists
+        Quagga.offDetected();
+        
+        // Listen for barcode detection
+        Quagga.onDetected(function(result) {
+            if (result && result.codeResult && result.codeResult.code) {
+                const code = result.codeResult.code;
+                console.log("Detected:", code);
+                
+                // Stop scanner before processing
+                Quagga.stop();
+                sampleScannerRunning = false;
+                
+                // Process the scanned code
+                onSampleScanned(code, { 
+                    result: { 
+                        format: { 
+                            formatName: result.codeResult.format 
+                        } 
+                    } 
+                });
+            }
+        });
+    });
 }
 async function startBoxScanner() {
     // Stop any existing scanner
-    if (boxScanner && boxScannerRunning) {
-        try {
-            await boxScanner.stop();
-            boxScannerRunning = false;
-        } catch (err) {
-            // Ignore
-        }
-    }
-    
     if (boxScanner) {
         try {
-            boxScanner.clear();
+            await Quagga.stop();
+            boxScanner = null;
+            boxScannerRunning = false;
         } catch (err) {
-            // Ignore
+            console.log('Stop error ignored');
         }
-        boxScanner = null;
     }
     
     const container = document.getElementById('scanner-box');
-    container.innerHTML = '';
+    container.innerHTML = '<div id="quagga-box" style="position:relative;width:100%;height:100%;"></div>';
     
     await new Promise(resolve => setTimeout(resolve, 100));
     
-    boxScanner = new Html5Qrcode('scanner-box');
-    
-    const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 150 },
-        aspectRatio: 1.333
-    };
-    
-    try {
-        await boxScanner.start(
-            { facingMode: 'environment' },
-            config,
-            (decodedText, decodedResult) => {
-                onBoxScanned(decodedText, decodedResult);
+    Quagga.init({
+        inputStream: {
+            name: "Live",
+            type: "LiveStream",
+            target: document.querySelector('#quagga-box'),
+            constraints: {
+                facingMode: "environment",
+                aspectRatio: { min: 1, max: 2 }
             },
-            (errorMessage) => {
-                // Ignore scan errors
+            area: {
+                top: "20%",
+                right: "10%",
+                left: "10%",
+                bottom: "20%"
             }
-        );
+        },
+        locator: {
+            patchSize: "medium",
+            halfSample: true
+        },
+        numOfWorkers: 4,
+        frequency: 10,
+        decoder: {
+            readers: [
+                "code_128_reader",
+                "code_39_reader",
+                "ean_reader",
+                "ean_8_reader",
+                "code_39_vin_reader",
+                "upc_reader",
+                "upc_e_reader"
+            ],
+            multiple: false
+        },
+        locate: true
+    }, function(err) {
+        if (err) {
+            console.error('Quagga init error:', err);
+            container.innerHTML = `
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:30px;text-align:center;">
+                    <p style="font-size:18px;font-weight:600;">📷 Camera Error</p>
+                    <p style="font-size:14px;margin-top:12px;">Please allow camera permissions</p>
+                    <button onclick="startBoxScanner()" style="margin-top:20px;padding:12px 24px;background:#0d9488;border:none;border-radius:8px;color:white;font-size:14px;cursor:pointer;">
+                        🔄 Try Again
+                    </button>
+                    <button onclick="showManualEntry('box')" style="margin-top:8px;padding:12px 24px;background:#64748b;border:none;border-radius:8px;color:white;font-size:14px;cursor:pointer;">
+                        ⌨️ Enter Manually
+                    </button>
+                </div>
+            `;
+            return;
+        }
         
+        console.log("Box scanner initialized");
+        Quagga.start();
         boxScannerRunning = true;
-        console.log('Box scanner started');
+        boxScanner = true;
         
-    } catch (err) {
-        console.error('Error starting box scanner:', err);
-        container.innerHTML = `
-            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
-                <p>Camera access required</p>
-                <p style="font-size:0.875rem;opacity:0.7;margin-top:8px;">Please allow camera permissions</p>
-                <button onclick="startBoxScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">
-                    Try Again
-                </button>
-            </div>
-        `;
-    }
+        Quagga.offDetected();
+        
+        Quagga.onDetected(function(result) {
+            if (result && result.codeResult && result.codeResult.code) {
+                const code = result.codeResult.code;
+                console.log("Detected:", code);
+                
+                Quagga.stop();
+                boxScannerRunning = false;
+                
+                onBoxScanned(code, { 
+                    result: { 
+                        format: { 
+                            formatName: result.codeResult.format 
+                        } 
+                    } 
+                });
+            }
+        });
+    });
 }
 // Add after the scanner initialization functions
 async function enableTorchIfAvailable(scanner, scannerType) {
@@ -244,43 +319,17 @@ async function enableTorchIfAvailable(scanner, scannerType) {
     }
 }
 async function stopAllScanners() {
-    // Stop sample scanner
-    if (sampleScanner && sampleScannerRunning) {
-        try {
-            await sampleScanner.stop();
-            sampleScannerRunning = false;
-        } catch (err) {
-            console.log('Sample scanner stop error (ignored):', err.message);
-        }
+    try {
+        Quagga.stop();
+        Quagga.offDetected();
+    } catch (err) {
+        console.log('Stop error ignored');
     }
     
-    if (sampleScanner) {
-        try {
-            sampleScanner.clear();
-        } catch (err) {
-            // Ignore
-        }
-        sampleScanner = null;
-    }
-    
-    // Stop box scanner
-    if (boxScanner && boxScannerRunning) {
-        try {
-            await boxScanner.stop();
-            boxScannerRunning = false;
-        } catch (err) {
-            console.log('Box scanner stop error (ignored):', err.message);
-        }
-    }
-    
-    if (boxScanner) {
-        try {
-            boxScanner.clear();
-        } catch (err) {
-            // Ignore
-        }
-        boxScanner = null;
-    }
+    sampleScanner = null;
+    boxScanner = null;
+    sampleScannerRunning = false;
+    boxScannerRunning = false;
 }
 
 async function onSampleScanned(decodedText, decodedResult) {
