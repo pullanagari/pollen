@@ -106,6 +106,62 @@ function resetTransferState() {
 
 
 // SAMPLE SCANNER
+function startTubeScanner() {
+
+    Quagga.init({
+
+        inputStream: {
+
+            type: "LiveStream",
+
+            target:
+                document.querySelector('#reader'),
+
+            constraints: {
+
+                facingMode: "environment",
+
+                width: 1920,
+                height: 1080
+            }
+        },
+
+        locator: {
+            patchSize: "large",
+            halfSample: false
+        },
+
+        decoder: {
+
+            readers: [
+                "code_128_reader"
+            ]
+        },
+
+        locate: true
+
+    },
+
+    function(err) {
+
+        if (err) {
+            console.log(err);
+            return;
+        }
+
+        Quagga.start();
+
+    });
+
+    Quagga.onDetected((result) => {
+
+        const code =
+            result.codeResult.code;
+
+        console.log(code);
+
+    });
+}
 function startSampleScanner() {
     console.log('Starting sample scanner...');
     
