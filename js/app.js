@@ -405,11 +405,10 @@ async function toggleFlash(scannerType) {
         }).then(async (stream) => {
         
             const track = stream.getVideoTracks()[0];
-        
+
             await track.applyConstraints({
                 advanced: [
-                    { focusMode: "continuous" },
-                    { torch: true }
+                    { focusMode: "continuous" }
                 ]
             });
         
