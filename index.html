@@ -2,41 +2,28 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0d9488">
     
-    <!-- FIXED: Added media-src for camera/microphone access -->
-    <!-- SINGLE CLEAN CSP -->
-    <meta http-equiv="Content-Security-Policy" content="
-    default-src 'self';
-    script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://docs.opencv.org;
-    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-    font-src 'self' https://fonts.gstatic.com;
-    img-src 'self' data: https:;
-    connect-src 'self' https://script.google.com https://script.googleusercontent.com https://nominatim.openstreetmap.org https://docs.opencv.org https://cdn.jsdelivr.net;
-    media-src 'self' blob: mediastream:;
-    worker-src 'self' blob:;
-    ">
+    <!-- CLEAN CSP - Only what we need -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://nominatim.openstreetmap.org; media-src 'self' blob: mediastream:;">
     
     <title>Pollen_SARDI - Pollen Sample Tracker</title>
     
-    <!-- FIXED: Consistent paths for GitHub Pages -->
     <link rel="manifest" href="/pollen/manifest.json">
     <link rel="icon" type="image/png" sizes="192x192" href="/pollen/icons/icon-192.png">
     <link rel="apple-touch-icon" href="/pollen/icons/icon-192.png">
-       
+    
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     
-    <!-- HTML5 QRCode Library -->
-    <!-- HTML5 QRCode Library -->
-    <script src="https://unpkg.com/@ericblade/quagga2/dist/quagga.min.js"></script>
-    <script src="https://unpkg.com/@zxing/library@latest"></script>
-    <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
-
-    
-    <!-- FIXED: Single CSS link with correct path -->
+    <!-- CSS -->
     <link rel="stylesheet" href="/pollen/css/styles.css">
+    
+    <!-- ONLY ONE SCANNER LIBRARY - Load BEFORE app.js -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
     <div id="app">
@@ -145,29 +132,11 @@
                 <div class="scan-instruction sample">
                     <div class="scan-icon">🧪</div>
                     <h2>Scan SAMPLE</h2>
-                    <p>What are you transferring?</p>
+                    <p>Position barcode in center of frame</p>
                 </div>
                 
                 <div id="scanner-sample" class="scanner-container"></div>
                 
-                <div class="scanning-tips">
-                    <h3>📱 Scanning Tips for Tubes:</h3>
-                    <ul>
-                        <li>Hold tube steady and flat against camera</li>
-                        <li>Align barcode in center of frame</li>
-                        <li>Avoid glare - angle tube slightly if needed</li>
-                        <li>Use flash button in low light</li>
-                        <li>Keep camera 4-6 inches from barcode</li>
-                    </ul>
-                </div>
-                
-                <button class="btn-flash" id="btn-flash-sample" onclick="toggleFlash('sample')">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                    </svg>
-                    Flash
-                </button>
-                                
                 <div class="manual-entry">
                     <button class="btn-text" onclick="showManualEntry('sample')">
                         Enter manually instead
@@ -211,17 +180,10 @@
                 <div class="scan-instruction box">
                     <div class="scan-icon">📦</div>
                     <h2>Scan BOX</h2>
-                    <p>Where is it going?</p>
+                    <p>Position barcode in center of frame</p>
                 </div>
                 
                 <div id="scanner-box" class="scanner-container"></div>
-                
-                <button class="btn-flash" id="btn-flash-box" onclick="toggleFlash('box')">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                    </svg>
-                    Flash
-                </button>
                 
                 <div class="manual-entry">
                     <button class="btn-text" onclick="showManualEntry('box')">
@@ -459,8 +421,7 @@
         </div>
     </div>
 
-    <!-- FIXED: Correct path for GitHub Pages -->
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <!-- Load app.js AFTER html5-qrcode -->
     <script src="/pollen/js/app.js"></script>
 </body>
 </html>
