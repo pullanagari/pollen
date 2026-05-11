@@ -109,6 +109,7 @@ function resetTransferState() {
 // ===== TUBE-OPTIMIZED SCANNER =====
 
 // SAMPLE SCANNER - Optimized for curved tubes
+// SAMPLE SCANNER - FIXED camera constraints
 async function startSampleScanner() {
     console.log('Starting sample scanner (tube-optimized)...');
     
@@ -134,24 +135,22 @@ async function startSampleScanner() {
     const container = document.getElementById('scanner-sample');
     container.innerHTML = '';
     
-    // Wait for cleanup
     await new Promise(resolve => setTimeout(resolve, 200));
     
     sampleScanner = new Html5Qrcode('scanner-sample');
     
     // TUBE-OPTIMIZED CONFIG
     const config = {
-        fps: 30,  // Higher FPS for better tube detection
+        fps: 30,
         
-        // CRITICAL: Wider, shorter box for horizontal tube barcodes
+        // Wide, short box for horizontal tube barcodes
         qrbox: function(viewfinderWidth, viewfinderHeight) {
-            // Make scan area much wider and shorter
             const width = Math.min(viewfinderWidth * 0.85, 320);
-            const height = Math.floor(width * 0.35);  // Very wide ratio
+            const height = Math.floor(width * 0.35);
             return { width: width, height: height };
         },
         
-        // Focus on 1D barcodes (tubes typically use CODE_128 or CODE_39)
+        // Focus on 1D barcodes common on tubes
         formatsToSupport: [
             Html5QrcodeSupportedFormats.CODE_128,
             Html5QrcodeSupportedFormats.CODE_39,
@@ -164,19 +163,13 @@ async function startSampleScanner() {
         ],
         
         disableFlip: false,
-        aspectRatio: 2.8  // Wide aspect for tubes
+        aspectRatio: 2.8
     };
     
     try {
+        // FIXED: Only pass facingMode, NOT advanced constraints
         await sampleScanner.start(
-            { 
-                facingMode: 'environment',
-                // Request higher resolution for better tube scanning
-                advanced: [
-                    { width: { min: 640, ideal: 1280 } },
-                    { height: { min: 480, ideal: 720 } }
-                ]
-            },
+            { facingMode: 'environment' },  // Simple constraint only
             config,
             (decodedText, decodedResult) => {
                 console.log('Sample scanned:', decodedText);
@@ -209,7 +202,7 @@ async function startSampleScanner() {
     }
 }
 
-// BOX SCANNER - Also optimized for tubes
+// BOX SCANNER - FIXED camera constraints
 async function startBoxScanner() {
     console.log('Starting box scanner (tube-optimized)...');
     
@@ -235,12 +228,10 @@ async function startBoxScanner() {
     const container = document.getElementById('scanner-box');
     container.innerHTML = '';
     
-    // Wait for cleanup
     await new Promise(resolve => setTimeout(resolve, 200));
     
     boxScanner = new Html5Qrcode('scanner-box');
     
-    // TUBE-OPTIMIZED CONFIG
     const config = {
         fps: 30,
         
@@ -266,14 +257,9 @@ async function startBoxScanner() {
     };
     
     try {
+        // FIXED: Only pass facingMode
         await boxScanner.start(
-            { 
-                facingMode: 'environment',
-                advanced: [
-                    { width: { min: 640, ideal: 1280 } },
-                    { height: { min: 480, ideal: 720 } }
-                ]
-            },
+            { facingMode: 'environment' },
             config,
             (decodedText, decodedResult) => {
                 console.log('Box scanned:', decodedText);
