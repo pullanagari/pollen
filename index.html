@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: https:; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://nominatim.openstreetmap.org;">
+    
+    <!-- FIXED: Added media-src for camera/microphone access -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: https:; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://nominatim.openstreetmap.org; media-src 'self' blob: mediastream:;">
+    
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0d9488">
     <meta name="description" content="Track sample transfers by scanning source and destination barcodes">
@@ -12,10 +15,10 @@
     
     <title>Pollen_SARDI - Pollen Sample Tracker</title>
     
-    <link rel="manifest" href="./manifest.json">
-    <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
-    <link rel="apple-touch-icon" href="./icons/icon-192.png">
-    <link rel="stylesheet" href="./css/styles.css">
+    <!-- FIXED: Consistent paths for GitHub Pages -->
+    <link rel="manifest" href="/pollen/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="/pollen/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="/pollen/icons/icon-192.png">
        
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -25,7 +28,8 @@
     <!-- HTML5 QRCode Library -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     
-    <link rel="stylesheet" href="css/styles.css">
+    <!-- FIXED: Single CSS link with correct path -->
+    <link rel="stylesheet" href="/pollen/css/styles.css">
 </head>
 <body>
     <div id="app">
@@ -138,6 +142,7 @@
                 </div>
                 
                 <div id="scanner-sample" class="scanner-container"></div>
+                
                 <div class="scanning-tips">
                     <h3>📱 Scanning Tips for Tubes:</h3>
                     <ul>
@@ -148,6 +153,7 @@
                         <li>Keep camera 4-6 inches from barcode</li>
                     </ul>
                 </div>
+                
                 <button class="btn-flash" id="btn-flash-sample" onclick="toggleFlash('sample')">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
@@ -446,6 +452,7 @@
         </div>
     </div>
 
-    <script src="./js/app.js"></script>
+    <!-- FIXED: Correct path for GitHub Pages -->
+    <script src="/pollen/js/app.js"></script>
 </body>
 </html>
