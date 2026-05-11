@@ -122,8 +122,8 @@ function startTubeScanner(targetElementId, onDetectedCallback) {
             target: target,
             constraints: {
                 facingMode: "environment",
-                width: 1920,
-                height: 1080
+                width: 450,
+                height: 140
             }
         },
 
@@ -185,87 +185,54 @@ function startTubeScanner(targetElementId, onDetectedCallback) {
         }
     });
 }
+let codeReader = null;
+
 function startSampleScanner() {
-    console.log('Starting sample scanner...');
-    
-    // Stop any existing scanner
-    if (sampleScanner && sampleScannerRunning) {
-        try {
-            sampleScanner.stop();
-            sampleScannerRunning = false;
-        } catch (err) {
-            console.log('Stop error ignored:', err);
-        }
-    }
-    
-    if (sampleScanner) {
-        try {
-            sampleScanner.clear();
-        } catch (err) {
-            console.log('Clear error ignored:', err);
-        }
-        sampleScanner = null;
-    }
-    
-    const container = document.getElementById('scanner-sample');
-    container.innerHTML = '';
-    
-    // Wait for cleanup
-    setTimeout(() => {
-        sampleScanner = new Html5Qrcode('scanner-sample');
-        
-        const config = {
-            fps: 15,
-            qrbox: {
-                width: 350,
-                height: 180
-            },
-            aspectRatio: 1.777,
-            videoConstraints: {
-                facingMode: {
-                    ideal: "environment"
-                },
-            
-                width: {
-                    ideal: 1920
-                },
-            
-                height: {
-                    ideal: 1080
+
+    console.log("Starting ZXing scanner...");
+
+    const container = document.getElementById("scanner-sample");
+
+    container.innerHTML = `
+        <video id="video" style="width:100%;height:100%;object-fit:cover;"></video>
+    `;
+
+    const videoElement = document.getElementById("video");
+
+    codeReader = new ZXing.BrowserMultiFormatReader();
+
+    let lastCode = null;
+    let stableCount = 0;
+
+    codeReader.decodeFromVideoDevice(
+        null,
+        videoElement,
+        (result, err) => {
+
+            if (result) {
+
+                const code = result.getText();
+
+                // 🔥 stability logic (IMPORTANT for tubes)
+                if (code === lastCode) {
+                    stableCount++;
+
+                    if (stableCount >= 3) {
+                        console.log("FINAL CODE:", code);
+
+                        onSampleScanned(code);
+
+                        codeReader.reset();
+                    }
+
+                } else {
+                    lastCode = code;
+                    stableCount = 0;
                 }
             }
-        };
-        
-        sampleScanner.start(
-            { facingMode: 'environment' },
-            config,
-            (decodedText, decodedResult) => {
-                console.log('Sample scanned:', decodedText);
-                onSampleScanned(decodedText, decodedResult);
-            },
-            (errorMessage) => {
-                // Ignore continuous scan errors
-            }
-        ).then(() => {
-            sampleScannerRunning = true;
-            console.log('Sample scanner started successfully');
-        }).catch(err => {
-            console.error('Error starting sample scanner:', err);
-            sampleScannerRunning = false;
-            container.innerHTML = `
-                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
-                    <p style="font-size:18px;font-weight:600;">📷 Camera Error</p>
-                    <p style="font-size:14px;margin-top:8px;">Please allow camera permissions</p>
-                    <p style="font-size:12px;opacity:0.7;margin-top:8px;">${err.message}</p>
-                    <button onclick="startSampleScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">
-                        Try Again
-                    </button>
-                </div>
-            `;
-        });
-    }, 200);
+        }
+    );
 }
-
 // BOX SCANNER
 function startBoxScanner() {
     console.log('Starting box scanner...');
@@ -331,7 +298,49 @@ function startBoxScanner() {
         });
     }, 200);
 }
+function waitForOpenCV(callback) {
+    const check = setInterval(() => {
+        if (cv && cv.Mat) {
+            clearInterval(check);
+            callback();
+        }
+    }, 100);
+}
+function enhanceFrame(video, canvas) {
 
+    const ctx = canvas.getContext("2d");
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    ctx.drawImage(video, 0, 0);
+
+    let src = cv.imread(canvas);
+    let gray = new cv.Mat();
+    let enhanced = new cv.Mat();
+
+    // grayscale
+    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+
+    // CLAHE (contrast enhancement)
+    let clahe = new cv.CLAHE(2.0, new cv.Size(8, 8));
+    clahe.apply(gray, enhanced);
+
+    // slight sharpening (kernel)
+    let kernel = cv.matFromArray(3, 3, cv.CV_32F, [
+        0, -1, 0,
+        -1, 5, -1,
+        0, -1, 0
+    ]);
+
+    cv.filter2D(enhanced, enhanced, cv.CV_8U, kernel);
+
+    cv.imshow(canvas, enhanced);
+
+    src.delete();
+    gray.delete();
+    enhanced.delete();
+}
 // STOP ALL SCANNERS
 async function stopAllScanners() {
 
