@@ -390,12 +390,21 @@ async function toggleFlash(scannerType) {
     try {
         const isActive = btn.classList.contains('active');
         
-        // Apply torch constraint
-        const stream = await navigator.mediaDevices.getUserMedia({
+        navigator.mediaDevices.getUserMedia({
             video: {
-                facingMode: 'environment',
-                advanced: [{ torch: !isActive }]
+                facingMode: "environment"
             }
+        }).then(async (stream) => {
+        
+            const track = stream.getVideoTracks()[0];
+        
+            await track.applyConstraints({
+                advanced: [
+                    { focusMode: "continuous" },
+                    { torch: true }
+                ]
+            });
+        
         });
         
         // Toggle button state
