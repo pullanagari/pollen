@@ -185,12 +185,25 @@ function startTubeScanner(targetElementId, onDetectedCallback) {
         }
     });
 }
+// =====================
+// GLOBAL SCANNER STATE
+// =====================
 let codeReader = null;
 let scanInterval = null;
+let lastCode = null;
+let stableCount = 0;
+let activeVideo = null;
+let activeCanvas = null;
+let scanning = false;
 
-function startSampleScanner() {
+// =====================
+// START SAMPLE SCANNER (TUBE FIXED)
+// =====================
+async function startSampleScanner() {
 
-    console.log("Starting enhanced tube scanner...");
+    console.log("Starting stable tube scanner...");
+
+    stopAllScanners();
 
     const container = document.getElementById("scanner-sample");
 
@@ -199,33 +212,40 @@ function startSampleScanner() {
         <canvas id="scanCanvas" style="display:none;"></canvas>
     `;
 
-    const video = document.getElementById("video");
-    const canvas = document.getElementById("scanCanvas");
+    activeVideo = document.getElementById("video");
+    activeCanvas = document.getElementById("scanCanvas");
 
     codeReader = new ZXing.BrowserMultiFormatReader();
 
-    let lastCode = null;
-    let stableCount = 0;
+    scanning = true;
+    lastCode = null;
+    stableCount = 0;
 
-    codeReader.decodeFromVideoDevice(
+    await codeReader.decodeFromVideoDevice(
         null,
-        video,
+        activeVideo,
         () => {}
-    ).then(() => {
+    );
 
-        // 🔥 CONTROLLED LOOP (IMPORTANT)
-        scanInterval = setInterval(() => {
+    // =====================
+    // CONTROLLED SCAN LOOP
+    // =====================
+    scanInterval = setInterval(() => {
 
-            if (!video.videoWidth) return;
+        if (!scanning || !activeVideo.videoWidth) return;
 
-            enhanceFrame(video, canvas); // OPEN-CV preprocessing
+        try {
+
+            enhanceFrame(activeVideo, activeCanvas);
 
             const tempReader = new ZXing.BrowserMultiFormatReader();
 
-            tempReader.decodeFromCanvas(canvas)
+            tempReader.decodeFromCanvas(activeCanvas)
                 .then(result => {
 
                     const code = result.getText();
+
+                    if (!code) return;
 
                     if (code === lastCode) {
                         stableCount++;
@@ -234,7 +254,9 @@ function startSampleScanner() {
 
                             console.log("FINAL TUBE CODE:", code);
 
-                            clearInterval(scanInterval);
+                            scanning = false;
+
+                            stopAllScanners();
 
                             onSampleScanned(code);
                         }
@@ -247,11 +269,12 @@ function startSampleScanner() {
                 })
                 .catch(() => {});
 
-        }, 150); // 6–7 FPS scanning (IMPORTANT)
+        } catch (e) {
+            console.log("scan error ignored");
+        }
 
-    });
+    }, 180); // stable FPS for tubes
 }
-// BOX SCANNER
 function startBoxScanner() {
     console.log('Starting box scanner...');
     
@@ -362,27 +385,31 @@ function enhanceFrame(video, canvas) {
 // STOP ALL SCANNERS
 async function stopAllScanners() {
 
+    scanning = false;
+
+    if (scanInterval) {
+        clearInterval(scanInterval);
+        scanInterval = null;
+    }
+
     try {
-        if (sampleScanner) {
-            await sampleScanner.stop();
-            await sampleScanner.clear();
+        if (codeReader) {
+            codeReader.reset();
+            codeReader = null;
         }
     } catch (e) {}
 
     try {
-        if (boxScanner) {
-            await boxScanner.stop();
-            await boxScanner.clear();
-        }
+        Quagga?.stop?.();
+        Quagga?.offDetected?.();
     } catch (e) {}
 
-    try {
-        Quagga.stop();
-        Quagga.offDetected();
-    } catch (e) {}
+    activeVideo = null;
+    activeCanvas = null;
 
     sampleScanner = null;
     boxScanner = null;
+
     sampleScannerRunning = false;
     boxScannerRunning = false;
 }
