@@ -4,14 +4,17 @@
     <meta charset="UTF-8">
     
     <!-- FIXED: Added media-src for camera/microphone access -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; img-src 'self' data: https:; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://nominatim.openstreetmap.org; media-src 'self' blob: mediastream:;">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#0d9488">
-    <meta name="description" content="Track sample transfers by scanning source and destination barcodes">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Pollen_SARDI">
+    <!-- SINGLE CLEAN CSP -->
+    <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://docs.opencv.org;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    font-src 'self' https://fonts.gstatic.com;
+    img-src 'self' data: https:;
+    connect-src 'self' https://script.google.com https://script.googleusercontent.com https://nominatim.openstreetmap.org https://docs.opencv.org https://cdn.jsdelivr.net;
+    media-src 'self' blob: mediastream:;
+    worker-src 'self' blob:;
+    ">
     
     <title>Pollen_SARDI - Pollen Sample Tracker</title>
     
