@@ -143,9 +143,17 @@ function startSampleScanner() {
             },
             aspectRatio: 1.777,
             videoConstraints: {
-                facingMode: "environment",
-                width: { ideal: 1920 },
-                height: { ideal: 1080 }
+                facingMode: {
+                    ideal: "environment"
+                },
+            
+                width: {
+                    ideal: 1920
+                },
+            
+                height: {
+                    ideal: 1080
+                }
             }
         };
         
