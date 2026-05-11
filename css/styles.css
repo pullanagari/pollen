@@ -819,7 +819,38 @@ body {
     padding-top: var(--space-sm);
     border-top: 1px solid var(--color-border);
 }
+/* Tube scanning guide */
+.tube-guide {
+    position: absolute;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    padding: 12px 20px;
+    border-radius: 12px;
+    max-width: 90%;
+    z-index: 10;
+}
 
+.tube-guide p {
+    color: white;
+    font-size: 12px;
+    margin: 4px 0;
+    line-height: 1.4;
+}
+
+/* Auto-hide after 6 seconds */
+.tube-guide {
+    animation: fadeOut 0.5s ease-out 6s forwards;
+}
+
+@keyframes fadeOut {
+    to {
+        opacity: 0;
+        pointer-events: none;
+    }
+}
 .empty-state {
     flex: 1;
     display: flex;
