@@ -110,7 +110,7 @@ async function startSampleScanner() {
             await sampleScanner.stop();
             sampleScannerRunning = false;
         } catch (err) {
-            // Ignore
+            console.log('Stop error ignored:', err);
         }
     }
     
@@ -118,35 +118,31 @@ async function startSampleScanner() {
         try {
             sampleScanner.clear();
         } catch (err) {
-            // Ignore
+            console.log('Clear error ignored:', err);
         }
         sampleScanner = null;
     }
     
     const container = document.getElementById('scanner-sample');
-    container.innerHTML = '';
+    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:white;"><p>Starting camera...</p></div>';
     
-    // Wait a bit for cleanup
     await new Promise(resolve => setTimeout(resolve, 100));
     
     sampleScanner = new Html5Qrcode('scanner-sample');
     
-    // ENHANCED CONFIG FOR CYLINDRICAL TUBES
+    // FIXED: Simplified config
     const config = {
-        fps: 30, // Increased from 10 - more frames = better chance to catch readable angle
+        fps: 30,
         qrbox: function(viewfinderWidth, viewfinderHeight) {
-            // Larger scan area for easier targeting
             const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            const qrboxSize = Math.floor(minEdge * 0.7); // 70% of screen
+            const qrboxSize = Math.floor(minEdge * 0.7);
             return {
                 width: qrboxSize,
-                height: Math.floor(qrboxSize * 0.5) // Wider rectangle for tube barcodes
+                height: Math.floor(qrboxSize * 0.5)
             };
         },
-        aspectRatio: 1.777778, // 16:9 for better tube scanning
-        disableFlip: false, // Allow flipping for better angle detection
-        
-        // CRITICAL: Format support
+        aspectRatio: 1.777778,
+        disableFlip: false,
         formatsToSupport: [
             Html5QrcodeSupportedFormats.QR_CODE,
             Html5QrcodeSupportedFormats.CODE_128,
@@ -156,26 +152,13 @@ async function startSampleScanner() {
             Html5QrcodeSupportedFormats.UPC_A,
             Html5QrcodeSupportedFormats.UPC_E,
             Html5QrcodeSupportedFormats.DATA_MATRIX
-        ],
-        
-        // Advanced decoding
-        experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true
-        }
-    };
-    
-    const cameraConfig = {
-        facingMode: 'environment',
-        // Advanced camera constraints for better focus
-        advanced: [
-            { focusMode: 'continuous' },
-            { zoom: 1.0 }
         ]
     };
     
     try {
+        // FIXED: Simple camera config with only 1 key
         await sampleScanner.start(
-            cameraConfig,
+            { facingMode: "environment" },  // ← Only 1 key!
             config,
             (decodedText, decodedResult) => {
                 onSampleScanned(decodedText, decodedResult);
@@ -184,21 +167,48 @@ async function startSampleScanner() {
                 // Ignore continuous scan errors
             }
         );
-        sampleScannerRunning = true;
         
-        // Try to enable torch/flash if available
-        enableTorchIfAvailable(sampleScanner, 'sample');
+        sampleScannerRunning = true;
+        console.log('Sample scanner started successfully');
         
     } catch (err) {
-        console.error('Error starting sample scanner:', err);
+        console.error('Scanner start error:', err);
         sampleScannerRunning = false;
+        
+        // Show detailed error message
+        let errorMsg = 'Camera access denied or unavailable';
+        let instructions = '';
+        
+        if (err.name === 'NotAllowedError' || err.message.includes('Permission')) {
+            errorMsg = '🔒 Camera Permission Needed';
+            instructions = `
+                <ol style="text-align:left;padding-left:20px;font-size:13px;line-height:1.6;margin-top:12px;">
+                    <li>Look for camera icon in address bar</li>
+                    <li>Tap it and select "Allow"</li>
+                    <li>Reload this page</li>
+                </ol>
+            `;
+        } else if (err.name === 'NotFoundError') {
+            errorMsg = '📷 No Camera Found';
+            instructions = '<p style="font-size:13px;margin-top:12px;">This device doesn\'t have a camera or it\'s in use by another app.</p>';
+        } else if (err.name === 'NotReadableError') {
+            errorMsg = '⚠️ Camera In Use';
+            instructions = '<p style="font-size:13px;margin-top:12px;">Close other apps using the camera and try again.</p>';
+        }
+        
         container.innerHTML = `
-            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
-                <p>📷 Camera access required</p>
-                <p style="font-size:0.875rem;opacity:0.7;margin-top:8px;">Please allow camera permissions</p>
-                <button onclick="startSampleScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;font-size:14px;">
-                    Try Again
-                </button>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:30px;text-align:center;">
+                <p style="font-size:18px;font-weight:600;margin-bottom:8px;">${errorMsg}</p>
+                ${instructions}
+                <div style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                    <button onclick="startSampleScanner()" style="padding:12px 24px;background:#0d9488;border:none;border-radius:8px;color:white;font-size:14px;font-weight:500;cursor:pointer;">
+                        🔄 Try Again
+                    </button>
+                    <button onclick="showManualEntry('sample')" style="padding:12px 24px;background:#64748b;border:none;border-radius:8px;color:white;font-size:14px;font-weight:500;cursor:pointer;">
+                        ⌨️ Enter Manually
+                    </button>
+                </div>
+                <p style="font-size:11px;opacity:0.6;margin-top:16px;">Error: ${err.message}</p>
             </div>
         `;
     }
@@ -210,7 +220,7 @@ async function startBoxScanner() {
             await boxScanner.stop();
             boxScannerRunning = false;
         } catch (err) {
-            // Ignore
+            console.log('Stop error ignored:', err);
         }
     }
     
@@ -218,33 +228,31 @@ async function startBoxScanner() {
         try {
             boxScanner.clear();
         } catch (err) {
-            // Ignore
+            console.log('Clear error ignored:', err);
         }
         boxScanner = null;
     }
     
     const container = document.getElementById('scanner-box');
-    container.innerHTML = '';
+    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:white;"><p>Starting camera...</p></div>';
     
-    // Wait a bit for cleanup
     await new Promise(resolve => setTimeout(resolve, 100));
     
     boxScanner = new Html5Qrcode('scanner-box');
     
-    // ENHANCED CONFIG FOR CYLINDRICAL TUBES
+    // FIXED: Simplified config
     const config = {
-        fps: 30, // Higher FPS for better scan success
+        fps: 30,
         qrbox: function(viewfinderWidth, viewfinderHeight) {
             const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
             const qrboxSize = Math.floor(minEdge * 0.7);
             return {
                 width: qrboxSize,
-                height: Math.floor(qrboxSize * 0.5) // Wider for tubes
+                height: Math.floor(qrboxSize * 0.5)
             };
         },
         aspectRatio: 1.777778,
         disableFlip: false,
-        
         formatsToSupport: [
             Html5QrcodeSupportedFormats.QR_CODE,
             Html5QrcodeSupportedFormats.CODE_128,
@@ -254,24 +262,13 @@ async function startBoxScanner() {
             Html5QrcodeSupportedFormats.UPC_A,
             Html5QrcodeSupportedFormats.UPC_E,
             Html5QrcodeSupportedFormats.DATA_MATRIX
-        ],
-        
-        experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true
-        }
-    };
-    
-    const cameraConfig = {
-        facingMode: 'environment',
-        advanced: [
-            { focusMode: 'continuous' },
-            { zoom: 1.0 }
         ]
     };
     
     try {
+        // FIXED: Simple camera config with only 1 key
         await boxScanner.start(
-            cameraConfig,
+            { facingMode: "environment" },  // ← Only 1 key!
             config,
             (decodedText, decodedResult) => {
                 onBoxScanned(decodedText, decodedResult);
@@ -280,21 +277,47 @@ async function startBoxScanner() {
                 // Ignore continuous scan errors
             }
         );
-        boxScannerRunning = true;
         
-        // Try to enable torch/flash if available
-        enableTorchIfAvailable(boxScanner, 'box');
+        boxScannerRunning = true;
+        console.log('Box scanner started successfully');
         
     } catch (err) {
-        console.error('Error starting box scanner:', err);
+        console.error('Scanner start error:', err);
         boxScannerRunning = false;
+        
+        let errorMsg = 'Camera access denied or unavailable';
+        let instructions = '';
+        
+        if (err.name === 'NotAllowedError' || err.message.includes('Permission')) {
+            errorMsg = '🔒 Camera Permission Needed';
+            instructions = `
+                <ol style="text-align:left;padding-left:20px;font-size:13px;line-height:1.6;margin-top:12px;">
+                    <li>Look for camera icon in address bar</li>
+                    <li>Tap it and select "Allow"</li>
+                    <li>Reload this page</li>
+                </ol>
+            `;
+        } else if (err.name === 'NotFoundError') {
+            errorMsg = '📷 No Camera Found';
+            instructions = '<p style="font-size:13px;margin-top:12px;">This device doesn\'t have a camera or it\'s in use by another app.</p>';
+        } else if (err.name === 'NotReadableError') {
+            errorMsg = '⚠️ Camera In Use';
+            instructions = '<p style="font-size:13px;margin-top:12px;">Close other apps using the camera and try again.</p>';
+        }
+        
         container.innerHTML = `
-            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
-                <p>📷 Camera access required</p>
-                <p style="font-size:0.875rem;opacity:0.7;margin-top:8px;">Please allow camera permissions</p>
-                <button onclick="startBoxScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;font-size:14px;">
-                    Try Again
-                </button>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:30px;text-align:center;">
+                <p style="font-size:18px;font-weight:600;margin-bottom:8px;">${errorMsg}</p>
+                ${instructions}
+                <div style="margin-top:20px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                    <button onclick="startBoxScanner()" style="padding:12px 24px;background:#0d9488;border:none;border-radius:8px;color:white;font-size:14px;font-weight:500;cursor:pointer;">
+                        🔄 Try Again
+                    </button>
+                    <button onclick="showManualEntry('box')" style="padding:12px 24px;background:#64748b;border:none;border-radius:8px;color:white;font-size:14px;font-weight:500;cursor:pointer;">
+                        ⌨️ Enter Manually
+                    </button>
+                </div>
+                <p style="font-size:11px;opacity:0.6;margin-top:16px;">Error: ${err.message}</p>
             </div>
         `;
     }
