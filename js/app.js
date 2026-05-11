@@ -106,21 +106,22 @@ function resetTransferState() {
 
 
 // SAMPLE SCANNER
-function startTubeScanner() {
+function startTubeScanner(targetElementId, onDetectedCallback) {
+
+    const target = document.querySelector('#' + targetElementId);
+
+    if (!target) {
+        console.error("Scanner target not found");
+        return;
+    }
 
     Quagga.init({
 
         inputStream: {
-
             type: "LiveStream",
-
-            target:
-                document.querySelector('#reader'),
-
+            target: target,
             constraints: {
-
                 facingMode: "environment",
-
                 width: 1920,
                 height: 1080
             }
@@ -132,7 +133,6 @@ function startTubeScanner() {
         },
 
         decoder: {
-
             readers: [
                 "code_128_reader"
             ]
@@ -140,26 +140,49 @@ function startTubeScanner() {
 
         locate: true
 
-    },
-
-    function(err) {
+    }, function(err) {
 
         if (err) {
-            console.log(err);
+            console.error("Quagga init error:", err);
             return;
         }
 
         Quagga.start();
 
+        console.log("Quagga started");
+
     });
+
+    let lastCode = null;
+    let stableCount = 0;
+
+    Quagga.offDetected(); // IMPORTANT RESET
 
     Quagga.onDetected((result) => {
 
-        const code =
-            result.codeResult.code;
+        const code = result.codeResult.code;
 
-        console.log(code);
+        if (!code) return;
 
+        if (code === lastCode) {
+
+            stableCount++;
+
+            if (stableCount >= 2) {
+
+                console.log("FINAL:", code);
+
+                if (onDetectedCallback) {
+                    onDetectedCallback(code);
+                }
+
+                stableCount = 0;
+            }
+
+        } else {
+            lastCode = code;
+            stableCount = 0;
+        }
     });
 }
 function startSampleScanner() {
@@ -310,44 +333,31 @@ function startBoxScanner() {
 }
 
 // STOP ALL SCANNERS
-function stopAllScanners() {
-    // Stop sample scanner
-    if (sampleScanner && sampleScannerRunning) {
-        try {
-            sampleScanner.stop();
-            sampleScannerRunning = false;
-        } catch (err) {
-            console.log('Sample scanner stop error (ignored)');
+async function stopAllScanners() {
+
+    try {
+        if (sampleScanner) {
+            await sampleScanner.stop();
+            await sampleScanner.clear();
         }
-    }
-    
-    if (sampleScanner) {
-        try {
-            sampleScanner.clear();
-        } catch (err) {
-            console.log('Sample scanner clear error (ignored)');
+    } catch (e) {}
+
+    try {
+        if (boxScanner) {
+            await boxScanner.stop();
+            await boxScanner.clear();
         }
-        sampleScanner = null;
-    }
-    
-    // Stop box scanner
-    if (boxScanner && boxScannerRunning) {
-        try {
-            boxScanner.stop();
-            boxScannerRunning = false;
-        } catch (err) {
-            console.log('Box scanner stop error (ignored)');
-        }
-    }
-    
-    if (boxScanner) {
-        try {
-            boxScanner.clear();
-        } catch (err) {
-            console.log('Box scanner clear error (ignored)');
-        }
-        boxScanner = null;
-    }
+    } catch (e) {}
+
+    try {
+        Quagga.stop();
+        Quagga.offDetected();
+    } catch (e) {}
+
+    sampleScanner = null;
+    boxScanner = null;
+    sampleScannerRunning = false;
+    boxScannerRunning = false;
 }
 // Add after the scanner initialization functions
 async function enableTorchIfAvailable(scanner, scannerType) {
@@ -443,44 +453,38 @@ function getBarcodeType(decodedResult) {
 }
 
 async function toggleFlash(scannerType) {
-    const btn = document.getElementById(`btn-flash-${scannerType}`);
-    const scanner = scannerType === 'sample' ? sampleScanner : boxScanner;
-    
-    if (!scanner) {
-        console.log('Scanner not initialized');
-        return;
-    }
-    
-    try {
-        const isActive = btn.classList.contains('active');
-        
-        navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: "environment"
-            }
-        }).then(async (stream) => {
-        
-            const track = stream.getVideoTracks()[0];
 
-            await track.applyConstraints({
-                advanced: [
-                    { focusMode: "continuous" }
-                ]
-            });
-        
-        });
-        
-        // Toggle button state
-        btn.classList.toggle('active');
-        
-        // Provide haptic feedback
-        if (navigator.vibrate) {
-            navigator.vibrate(50);
+    const btn = document.getElementById(`btn-flash-${scannerType}`);
+
+    try {
+
+        const track =
+            sampleScanner
+            ? sampleScanner._context?.stream?.getVideoTracks?.()[0]
+            : null;
+
+        if (!track) {
+            alert("Flash not available");
+            return;
         }
-        
+
+        const capabilities = track.getCapabilities();
+
+        if (!capabilities.torch) {
+            alert("Torch not supported");
+            return;
+        }
+
+        const enabled = btn.classList.toggle("active");
+
+        await track.applyConstraints({
+            advanced: [{ torch: enabled }]
+        });
+
+        if (navigator.vibrate) navigator.vibrate(50);
+
     } catch (err) {
-        console.error('Flash toggle error:', err);
-        alert('Flash not available on this device');
+        console.error(err);
     }
 }
 
