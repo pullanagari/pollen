@@ -110,8 +110,9 @@ function resetTransferState() {
 
 // SAMPLE SCANNER - Optimized for curved tubes
 // SAMPLE SCANNER - FIXED camera constraints
+// ===== SAMPLE SCANNER - WORKING VERSION =====
 async function startSampleScanner() {
-    console.log('Starting sample scanner (tube-optimized)...');
+    console.log('Starting sample scanner...');
     
     // Stop any existing scanner
     if (sampleScanner && sampleScannerRunning) {
@@ -119,16 +120,14 @@ async function startSampleScanner() {
             await sampleScanner.stop();
             sampleScannerRunning = false;
         } catch (err) {
-            console.log('Stop error ignored:', err);
+            console.log('Stop error ignored');
         }
     }
     
     if (sampleScanner) {
         try {
             sampleScanner.clear();
-        } catch (err) {
-            console.log('Clear error ignored:', err);
-        }
+        } catch (err) {}
         sampleScanner = null;
     }
     
@@ -139,52 +138,33 @@ async function startSampleScanner() {
     
     sampleScanner = new Html5Qrcode('scanner-sample');
     
-    // TUBE-OPTIMIZED CONFIG
+    // SIMPLE CONFIG - NO ADVANCED CONSTRAINTS
     const config = {
         fps: 30,
-        
-        // Wide, short box for horizontal tube barcodes
         qrbox: function(viewfinderWidth, viewfinderHeight) {
             const width = Math.min(viewfinderWidth * 0.85, 320);
             const height = Math.floor(width * 0.35);
             return { width: width, height: height };
         },
-        
-        // Focus on 1D barcodes common on tubes
-        formatsToSupport: [
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.CODE_93,
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E,
-            Html5QrcodeSupportedFormats.QR_CODE
-        ],
-        
-        disableFlip: false,
-        aspectRatio: 2.8
+        disableFlip: false
     };
     
     try {
-        // FIXED: Only pass facingMode, NOT advanced constraints
+        // CRITICAL: ONLY pass facingMode - nothing else!
         await sampleScanner.start(
-            { facingMode: 'environment' },  // Simple constraint only
+            { facingMode: 'environment' },
             config,
             (decodedText, decodedResult) => {
                 console.log('Sample scanned:', decodedText);
                 onSampleScanned(decodedText, decodedResult);
-            },
-            (errorMessage) => {
-                // Ignore continuous scan errors
             }
         );
         
         sampleScannerRunning = true;
-        console.log('Sample scanner started (tube mode)');
+        console.log('Sample scanner started successfully');
         
     } catch (err) {
-        console.error('Error starting sample scanner:', err);
+        console.error('Scanner error:', err);
         sampleScannerRunning = false;
         container.innerHTML = `
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
@@ -202,9 +182,9 @@ async function startSampleScanner() {
     }
 }
 
-// BOX SCANNER - FIXED camera constraints
+// ===== BOX SCANNER - WORKING VERSION =====
 async function startBoxScanner() {
-    console.log('Starting box scanner (tube-optimized)...');
+    console.log('Starting box scanner...');
     
     // Stop any existing scanner
     if (boxScanner && boxScannerRunning) {
@@ -212,16 +192,14 @@ async function startBoxScanner() {
             await boxScanner.stop();
             boxScannerRunning = false;
         } catch (err) {
-            console.log('Stop error ignored:', err);
+            console.log('Stop error ignored');
         }
     }
     
     if (boxScanner) {
         try {
             boxScanner.clear();
-        } catch (err) {
-            console.log('Clear error ignored:', err);
-        }
+        } catch (err) {}
         boxScanner = null;
     }
     
@@ -234,47 +212,30 @@ async function startBoxScanner() {
     
     const config = {
         fps: 30,
-        
         qrbox: function(viewfinderWidth, viewfinderHeight) {
             const width = Math.min(viewfinderWidth * 0.85, 320);
             const height = Math.floor(width * 0.35);
             return { width: width, height: height };
         },
-        
-        formatsToSupport: [
-            Html5QrcodeSupportedFormats.CODE_128,
-            Html5QrcodeSupportedFormats.CODE_39,
-            Html5QrcodeSupportedFormats.CODE_93,
-            Html5QrcodeSupportedFormats.EAN_13,
-            Html5QrcodeSupportedFormats.EAN_8,
-            Html5QrcodeSupportedFormats.UPC_A,
-            Html5QrcodeSupportedFormats.UPC_E,
-            Html5QrcodeSupportedFormats.QR_CODE
-        ],
-        
-        disableFlip: false,
-        aspectRatio: 2.8
+        disableFlip: false
     };
     
     try {
-        // FIXED: Only pass facingMode
+        // CRITICAL: ONLY pass facingMode
         await boxScanner.start(
             { facingMode: 'environment' },
             config,
             (decodedText, decodedResult) => {
                 console.log('Box scanned:', decodedText);
                 onBoxScanned(decodedText, decodedResult);
-            },
-            (errorMessage) => {
-                // Ignore continuous scan errors
             }
         );
         
         boxScannerRunning = true;
-        console.log('Box scanner started (tube mode)');
+        console.log('Box scanner started successfully');
         
     } catch (err) {
-        console.error('Error starting box scanner:', err);
+        console.error('Scanner error:', err);
         boxScannerRunning = false;
         container.innerHTML = `
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
