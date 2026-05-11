@@ -131,31 +131,74 @@ async function startSampleScanner() {
     
     sampleScanner = new Html5Qrcode('scanner-sample');
     
+    // ENHANCED CONFIG FOR CYLINDRICAL TUBES
     const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 150 },
-        aspectRatio: 1.333
+        fps: 30, // Increased from 10 - more frames = better chance to catch readable angle
+        qrbox: function(viewfinderWidth, viewfinderHeight) {
+            // Larger scan area for easier targeting
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            const qrboxSize = Math.floor(minEdge * 0.7); // 70% of screen
+            return {
+                width: qrboxSize,
+                height: Math.floor(qrboxSize * 0.5) // Wider rectangle for tube barcodes
+            };
+        },
+        aspectRatio: 1.777778, // 16:9 for better tube scanning
+        disableFlip: false, // Allow flipping for better angle detection
+        
+        // CRITICAL: Format support
+        formatsToSupport: [
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.DATA_MATRIX
+        ],
+        
+        // Advanced decoding
+        experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+        }
+    };
+    
+    const cameraConfig = {
+        facingMode: 'environment',
+        // Advanced camera constraints for better focus
+        advanced: [
+            { focusMode: 'continuous' },
+            { zoom: 1.0 }
+        ]
     };
     
     try {
         await sampleScanner.start(
-            { facingMode: 'environment' },
+            cameraConfig,
             config,
             (decodedText, decodedResult) => {
                 onSampleScanned(decodedText, decodedResult);
             },
             (errorMessage) => {
-                // Ignore scan errors
+                // Ignore continuous scan errors
             }
         );
-        sampleScannerRunning = true; // Mark as running
+        sampleScannerRunning = true;
+        
+        // Try to enable torch/flash if available
+        enableTorchIfAvailable(sampleScanner, 'sample');
+        
     } catch (err) {
         console.error('Error starting sample scanner:', err);
         sampleScannerRunning = false;
         container.innerHTML = `
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
-                <p>Camera access required</p>
+                <p>📷 Camera access required</p>
                 <p style="font-size:0.875rem;opacity:0.7;margin-top:8px;">Please allow camera permissions</p>
+                <button onclick="startSampleScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;font-size:14px;">
+                    Try Again
+                </button>
             </div>
         `;
     }
@@ -188,33 +231,90 @@ async function startBoxScanner() {
     
     boxScanner = new Html5Qrcode('scanner-box');
     
+    // ENHANCED CONFIG FOR CYLINDRICAL TUBES
     const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 150 },
-        aspectRatio: 1.333
+        fps: 30, // Higher FPS for better scan success
+        qrbox: function(viewfinderWidth, viewfinderHeight) {
+            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            const qrboxSize = Math.floor(minEdge * 0.7);
+            return {
+                width: qrboxSize,
+                height: Math.floor(qrboxSize * 0.5) // Wider for tubes
+            };
+        },
+        aspectRatio: 1.777778,
+        disableFlip: false,
+        
+        formatsToSupport: [
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.DATA_MATRIX
+        ],
+        
+        experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+        }
+    };
+    
+    const cameraConfig = {
+        facingMode: 'environment',
+        advanced: [
+            { focusMode: 'continuous' },
+            { zoom: 1.0 }
+        ]
     };
     
     try {
         await boxScanner.start(
-            { facingMode: 'environment' },
+            cameraConfig,
             config,
             (decodedText, decodedResult) => {
                 onBoxScanned(decodedText, decodedResult);
             },
             (errorMessage) => {
-                // Ignore scan errors
+                // Ignore continuous scan errors
             }
         );
-        boxScannerRunning = true; // Mark as running
+        boxScannerRunning = true;
+        
+        // Try to enable torch/flash if available
+        enableTorchIfAvailable(boxScanner, 'box');
+        
     } catch (err) {
         console.error('Error starting box scanner:', err);
         boxScannerRunning = false;
         container.innerHTML = `
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
-                <p>Camera access required</p>
+                <p>📷 Camera access required</p>
                 <p style="font-size:0.875rem;opacity:0.7;margin-top:8px;">Please allow camera permissions</p>
+                <button onclick="startBoxScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;font-size:14px;">
+                    Try Again
+                </button>
             </div>
         `;
+    }
+}
+// Add after the scanner initialization functions
+async function enableTorchIfAvailable(scanner, scannerType) {
+    try {
+        // Check if torch is available
+        const capabilities = await scanner.getCapabilities();
+        
+        if (capabilities && capabilities.torch) {
+            // Torch is available - enable the flash button
+            const flashBtn = document.getElementById(`btn-flash-${scannerType}`);
+            if (flashBtn) {
+                flashBtn.style.display = 'flex';
+                flashBtn.disabled = false;
+            }
+        }
+    } catch (err) {
+        console.log('Torch not available:', err);
     }
 }
 async function stopAllScanners() {
@@ -318,11 +418,38 @@ function getBarcodeType(decodedResult) {
     return 'Unknown';
 }
 
-function toggleFlash(scanner) {
-    // Flash toggle implementation depends on browser support
-    // This is a placeholder - actual implementation requires checking torch capability
-    const btn = document.getElementById(`btn-flash-${scanner}`);
-    btn.classList.toggle('active');
+async function toggleFlash(scannerType) {
+    const btn = document.getElementById(`btn-flash-${scannerType}`);
+    const scanner = scannerType === 'sample' ? sampleScanner : boxScanner;
+    
+    if (!scanner) {
+        console.log('Scanner not initialized');
+        return;
+    }
+    
+    try {
+        const isActive = btn.classList.contains('active');
+        
+        // Apply torch constraint
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: 'environment',
+                advanced: [{ torch: !isActive }]
+            }
+        });
+        
+        // Toggle button state
+        btn.classList.toggle('active');
+        
+        // Provide haptic feedback
+        if (navigator.vibrate) {
+            navigator.vibrate(50);
+        }
+        
+    } catch (err) {
+        console.error('Flash toggle error:', err);
+        alert('Flash not available on this device');
+    }
 }
 
 // ===== MANUAL ENTRY =====
