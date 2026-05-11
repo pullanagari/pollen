@@ -136,7 +136,7 @@ function startSampleScanner() {
         sampleScanner = new Html5Qrcode('scanner-sample');
         
         const config = {
-            fps: 10,
+            fps: 3,
             qrbox: { width: 250, height: 150 },
             aspectRatio: 1.333
         };
