@@ -1,6 +1,6 @@
 /**
  * Pollen_SARDI PWA - Sample Transfer Tracker
- * Main Application Logic
+ * Clean version with html5-qrcode only
  */
 
 // ===== STATE MANAGEMENT =====
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Register service worker
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('service-worker.js')
+        navigator.serviceWorker.register('/pollen/service-worker.js')
             .then(reg => console.log('Service Worker registered'))
             .catch(err => console.log('Service Worker registration failed:', err));
     }
@@ -78,19 +78,20 @@ async function goBackToSampleScan() {
     state.boxId = null;
     state.boxType = null;
     showScreen('scan-sample');
-    await startSampleScanner();
+    setTimeout(() => startSampleScanner(), 300);
 }
+
 async function goBackToBoxScan() {
     await stopAllScanners();
     showScreen('scan-box');
-    await startBoxScanner();
+    setTimeout(() => startBoxScanner(), 300);
 }
 
 // ===== TRANSFER WORKFLOW =====
 function startTransfer() {
     resetTransferState();
     showScreen('scan-sample');
-    startSampleScanner();
+    setTimeout(() => startSampleScanner(), 300);
 }
 
 function resetTransferState() {
@@ -104,184 +105,83 @@ function resetTransferState() {
 
 // ===== BARCODE SCANNING =====
 
-
 // SAMPLE SCANNER
-function startTubeScanner(targetElementId, onDetectedCallback) {
-
-    const target = document.querySelector('#' + targetElementId);
-
-    if (!target) {
-        console.error("Scanner target not found");
-        return;
-    }
-
-    Quagga.init({
-
-        inputStream: {
-            type: "LiveStream",
-            target: target,
-            constraints: {
-                facingMode: "environment",
-                width: 450,
-                height: 140
-            }
-        },
-
-        locator: {
-            patchSize: "large",
-            halfSample: false
-        },
-
-        decoder: {
-            readers: [
-                "code_128_reader"
-            ]
-        },
-
-        locate: true
-
-    }, function(err) {
-
-        if (err) {
-            console.error("Quagga init error:", err);
-            return;
-        }
-
-        Quagga.start();
-
-        console.log("Quagga started");
-
-    });
-
-    let lastCode = null;
-    let stableCount = 0;
-
-    Quagga.offDetected(); // IMPORTANT RESET
-
-    Quagga.onDetected((result) => {
-
-        const code = result.codeResult.code;
-
-        if (!code) return;
-
-        if (code === lastCode) {
-
-            stableCount++;
-
-            if (stableCount >= 2) {
-
-                console.log("FINAL:", code);
-
-                if (onDetectedCallback) {
-                    onDetectedCallback(code);
-                }
-
-                stableCount = 0;
-            }
-
-        } else {
-            lastCode = code;
-            stableCount = 0;
-        }
-    });
-}
-// =====================
-// GLOBAL SCANNER STATE
-// =====================
-let codeReader = null;
-let scanInterval = null;
-let lastCode = null;
-let stableCount = 0;
-let activeVideo = null;
-let activeCanvas = null;
-let scanning = false;
-
-// =====================
-// START SAMPLE SCANNER (TUBE FIXED)
-// =====================
 async function startSampleScanner() {
-
-    console.log("Starting stable tube scanner...");
-
-    stopAllScanners();
-
-    const container = document.getElementById("scanner-sample");
-
-    container.innerHTML = `
-        <video id="video" autoplay playsinline></video>
-        <canvas id="scanCanvas" style="display:none;"></canvas>
-    `;
-
-    activeVideo = document.getElementById("video");
-    activeCanvas = document.getElementById("scanCanvas");
-
-    codeReader = new ZXing.BrowserMultiFormatReader();
-
-    scanning = true;
-    lastCode = null;
-    stableCount = 0;
-
-    await codeReader.decodeFromVideoDevice(
-        null,
-        activeVideo,
-        () => {}
-    );
-
-    // =====================
-    // CONTROLLED SCAN LOOP
-    // =====================
-    scanInterval = setInterval(() => {
-
-        if (!scanning || !activeVideo.videoWidth) return;
-
+    console.log('Starting sample scanner...');
+    
+    // Stop any existing scanner
+    if (sampleScanner && sampleScannerRunning) {
         try {
-
-            enhanceFrame(activeVideo, activeCanvas);
-
-            const tempReader = new ZXing.BrowserMultiFormatReader();
-
-            tempReader.decodeFromCanvas(activeCanvas)
-                .then(result => {
-
-                    const code = result.getText();
-
-                    if (!code) return;
-
-                    if (code === lastCode) {
-                        stableCount++;
-
-                        if (stableCount >= 3) {
-
-                            console.log("FINAL TUBE CODE:", code);
-
-                            scanning = false;
-
-                            stopAllScanners();
-
-                            onSampleScanned(code);
-                        }
-
-                    } else {
-                        lastCode = code;
-                        stableCount = 0;
-                    }
-
-                })
-                .catch(() => {});
-
-        } catch (e) {
-            console.log("scan error ignored");
+            await sampleScanner.stop();
+            sampleScannerRunning = false;
+        } catch (err) {
+            console.log('Stop error ignored:', err);
         }
-
-    }, 180); // stable FPS for tubes
+    }
+    
+    if (sampleScanner) {
+        try {
+            sampleScanner.clear();
+        } catch (err) {
+            console.log('Clear error ignored:', err);
+        }
+        sampleScanner = null;
+    }
+    
+    const container = document.getElementById('scanner-sample');
+    container.innerHTML = '';
+    
+    // Wait for cleanup
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    sampleScanner = new Html5Qrcode('scanner-sample');
+    
+    const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 150 },
+        aspectRatio: 1.667
+    };
+    
+    try {
+        await sampleScanner.start(
+            { facingMode: 'environment' },
+            config,
+            (decodedText, decodedResult) => {
+                console.log('Sample scanned:', decodedText);
+                onSampleScanned(decodedText, decodedResult);
+            },
+            (errorMessage) => {
+                // Ignore continuous scan errors
+            }
+        );
+        
+        sampleScannerRunning = true;
+        console.log('Sample scanner started successfully');
+        
+    } catch (err) {
+        console.error('Error starting sample scanner:', err);
+        sampleScannerRunning = false;
+        container.innerHTML = `
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
+                <p style="font-size:18px;font-weight:600;">📷 Camera Error</p>
+                <p style="font-size:14px;margin-top:8px;">Please allow camera permissions</p>
+                <p style="font-size:12px;opacity:0.7;margin-top:8px;">${err.message}</p>
+                <button onclick="startSampleScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">
+                    Try Again
+                </button>
+            </div>
+        `;
+    }
 }
-function startBoxScanner() {
+
+// BOX SCANNER
+async function startBoxScanner() {
     console.log('Starting box scanner...');
     
     // Stop any existing scanner
     if (boxScanner && boxScannerRunning) {
         try {
-            boxScanner.stop();
+            await boxScanner.stop();
             boxScannerRunning = false;
         } catch (err) {
             console.log('Stop error ignored:', err);
@@ -301,16 +201,18 @@ function startBoxScanner() {
     container.innerHTML = '';
     
     // Wait for cleanup
-    setTimeout(() => {
-        boxScanner = new Html5Qrcode('scanner-box');
-        
-        const config = {
-            fps: 10,
-            qrbox: { width: 350, height: 120 },
-            aspectRatio: 1.333
-        };
-        
-        boxScanner.start(
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    boxScanner = new Html5Qrcode('scanner-box');
+    
+    const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 150 },
+        aspectRatio: 1.667
+    };
+    
+    try {
+        await boxScanner.start(
             { facingMode: 'environment' },
             config,
             (decodedText, decodedResult) => {
@@ -320,131 +222,69 @@ function startBoxScanner() {
             (errorMessage) => {
                 // Ignore continuous scan errors
             }
-        ).then(() => {
-            boxScannerRunning = true;
-            console.log('Box scanner started successfully');
-        }).catch(err => {
-            console.error('Error starting box scanner:', err);
-            boxScannerRunning = false;
-            container.innerHTML = `
-                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
-                    <p style="font-size:18px;font-weight:600;">📷 Camera Error</p>
-                    <p style="font-size:14px;margin-top:8px;">Please allow camera permissions</p>
-                    <p style="font-size:12px;opacity:0.7;margin-top:8px;">${err.message}</p>
-                    <button onclick="startBoxScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">
-                        Try Again
-                    </button>
-                </div>
-            `;
-        });
-    }, 200);
+        );
+        
+        boxScannerRunning = true;
+        console.log('Box scanner started successfully');
+        
+    } catch (err) {
+        console.error('Error starting box scanner:', err);
+        boxScannerRunning = false;
+        container.innerHTML = `
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
+                <p style="font-size:18px;font-weight:600;">📷 Camera Error</p>
+                <p style="font-size:14px;margin-top:8px;">Please allow camera permissions</p>
+                <p style="font-size:12px;opacity:0.7;margin-top:8px;">${err.message}</p>
+                <button onclick="startBoxScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">
+                    Try Again
+                </button>
+            </div>
+        `;
+    }
 }
-function waitForOpenCV(callback) {
-    const check = setInterval(() => {
-        if (cv && cv.Mat) {
-            clearInterval(check);
-            callback();
-        }
-    }, 100);
-}
-function enhanceFrame(video, canvas) {
 
-    const ctx = canvas.getContext("2d");
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    ctx.drawImage(video, 0, 0);
-
-    let src = cv.imread(canvas);
-    let gray = new cv.Mat();
-    let enhanced = new cv.Mat();
-
-    cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-
-    let clahe = new cv.CLAHE(2.0, new cv.Size(8, 8));
-    clahe.apply(gray, enhanced);
-
-    let kernel = cv.matFromArray(3, 3, cv.CV_32F, [
-        0, -1, 0,
-        -1, 5, -1,
-        0, -1, 0
-    ]);
-
-    cv.filter2D(enhanced, enhanced, cv.CV_8U, kernel);
-
-    cv.imshow(canvas, enhanced);
-
-    // cleanup (IMPORTANT)
-    src.delete();
-    gray.delete();
-    enhanced.delete();
-    clahe.delete();
-    kernel.delete();
-}
 // STOP ALL SCANNERS
 async function stopAllScanners() {
-
-    scanning = false;
-
-    if (scanInterval) {
-        clearInterval(scanInterval);
-        scanInterval = null;
-    }
-
-    try {
-        if (codeReader) {
-            codeReader.reset();
-            codeReader = null;
+    // Stop sample scanner
+    if (sampleScanner && sampleScannerRunning) {
+        try {
+            await sampleScanner.stop();
+            sampleScannerRunning = false;
+        } catch (err) {
+            console.log('Sample scanner stop error (ignored)');
         }
-    } catch (e) {}
-
-    try {
-        Quagga?.stop?.();
-        Quagga?.offDetected?.();
-    } catch (e) {}
-
-    activeVideo = null;
-    activeCanvas = null;
-
-    sampleScanner = null;
-    boxScanner = null;
-
-    sampleScannerRunning = false;
-    boxScannerRunning = false;
-}
-// Add after the scanner initialization functions
-async function enableTorchIfAvailable(scanner, scannerType) {
-    try {
-        // Check if torch is available
-        const capabilities = await scanner.getCapabilities();
-        
-        if (capabilities && capabilities.torch) {
-            // Torch is available - enable the flash button
-            const flashBtn = document.getElementById(`btn-flash-${scannerType}`);
-            if (flashBtn) {
-                flashBtn.style.display = 'flex';
-                flashBtn.disabled = false;
-            }
-        }
-    } catch (err) {
-        console.log('Torch not available:', err);
-    }
-}
-async function stopAllScanners() {
-    try {
-        Quagga.stop();
-        Quagga.offDetected();
-    } catch (err) {
-        console.log('Stop error ignored');
     }
     
-    sampleScanner = null;
-    boxScanner = null;
-    sampleScannerRunning = false;
-    boxScannerRunning = false;
+    if (sampleScanner) {
+        try {
+            sampleScanner.clear();
+        } catch (err) {
+            console.log('Sample scanner clear error (ignored)');
+        }
+        sampleScanner = null;
+    }
+    
+    // Stop box scanner
+    if (boxScanner && boxScannerRunning) {
+        try {
+            await boxScanner.stop();
+            boxScannerRunning = false;
+        } catch (err) {
+            console.log('Box scanner stop error (ignored)');
+        }
+    }
+    
+    if (boxScanner) {
+        try {
+            boxScanner.clear();
+        } catch (err) {
+            console.log('Box scanner clear error (ignored)');
+        }
+        boxScanner = null;
+    }
 }
 
+// SCAN CALLBACKS
 async function onSampleScanned(decodedText, decodedResult) {
     // Vibrate for feedback
     if (navigator.vibrate) {
@@ -455,23 +295,7 @@ async function onSampleScanned(decodedText, decodedResult) {
     state.sampleType = getBarcodeType(decodedResult);
     
     // Stop sample scanner
-    if (sampleScanner && sampleScannerRunning) {
-        try {
-            await sampleScanner.stop();
-            sampleScannerRunning = false;
-        } catch (err) {
-            console.log('Scanner stop error (ignored)');
-        }
-    }
-    
-    if (sampleScanner) {
-        try {
-            sampleScanner.clear();
-        } catch (err) {
-            // Ignore
-        }
-        sampleScanner = null;
-    }
+    await stopAllScanners();
     
     // Wait a moment for cleanup
     await new Promise(resolve => setTimeout(resolve, 200));
@@ -481,8 +305,9 @@ async function onSampleScanned(decodedText, decodedResult) {
     showScreen('scan-box');
     
     // Start box scanner
-    await startBoxScanner();
+    setTimeout(() => startBoxScanner(), 300);
 }
+
 async function onBoxScanned(decodedText, decodedResult) {
     // Vibrate for feedback
     if (navigator.vibrate) {
@@ -496,50 +321,15 @@ async function onBoxScanned(decodedText, decodedResult) {
     await stopAllScanners();
     
     // Move to review screen
-    showReviewScreen();
+    setTimeout(() => showReviewScreen(), 200);
 }
+
 function getBarcodeType(decodedResult) {
     if (decodedResult && decodedResult.result && decodedResult.result.format) {
         const format = decodedResult.result.format.formatName;
         return format || 'Unknown';
     }
     return 'Unknown';
-}
-
-async function toggleFlash(scannerType) {
-
-    const btn = document.getElementById(`btn-flash-${scannerType}`);
-
-    try {
-
-        const track =
-            sampleScanner
-            ? sampleScanner._context?.stream?.getVideoTracks?.()[0]
-            : null;
-
-        if (!track) {
-            alert("Flash not available");
-            return;
-        }
-
-        const capabilities = track.getCapabilities();
-
-        if (!capabilities.torch) {
-            alert("Torch not supported");
-            return;
-        }
-
-        const enabled = btn.classList.toggle("active");
-
-        await track.applyConstraints({
-            advanced: [{ torch: enabled }]
-        });
-
-        if (navigator.vibrate) navigator.vibrate(50);
-
-    } catch (err) {
-        console.error(err);
-    }
 }
 
 // ===== MANUAL ENTRY =====
@@ -562,7 +352,7 @@ function closeManualEntry() {
     state.manualEntryTarget = null;
 }
 
-function submitManualEntry() {
+async function submitManualEntry() {
     const input = document.getElementById('manual-input');
     const value = input.value.trim();
     
@@ -575,20 +365,20 @@ function submitManualEntry() {
         state.sampleId = value;
         state.sampleType = 'Manual';
         
-        stopAllScanners();
+        await stopAllScanners();
         closeManualEntry();
         
         document.getElementById('captured-sample-id').textContent = truncateText(state.sampleId, 15);
         showScreen('scan-box');
-        startBoxScanner();
+        setTimeout(() => startBoxScanner(), 300);
     } else if (state.manualEntryTarget === 'box') {
         state.boxId = value;
         state.boxType = 'Manual';
         
-        stopAllScanners();
+        await stopAllScanners();
         closeManualEntry();
         
-        showReviewScreen();
+        setTimeout(() => showReviewScreen(), 200);
     }
 }
 
@@ -726,9 +516,9 @@ async function syncTransfer(transfer) {
     if (!state.settings.apiUrl) return false;
     
     try {
-        const response = await fetch(state.settings.apiUrl + '?action=addTransfer', {
+        const response = await fetch(state.settings.apiUrl, {
             method: 'POST',
-            mode: 'no-cors', // Google Apps Script requires this
+            mode: 'no-cors',
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -855,8 +645,6 @@ function setFilter(filter) {
 
 // ===== DASHBOARD =====
 function showDashboard() {
-    // For now, redirect to history
-    // Future: implement actual dashboard with charts
     showHistory();
 }
 
@@ -875,7 +663,6 @@ function saveSettings() {
     localStorage.setItem('pollen_sardi_settings', JSON.stringify(state.settings));
     closeSettings();
     
-    // Try to sync pending transfers with new URL
     if (state.settings.apiUrl && navigator.onLine) {
         syncPendingTransfers();
     }
