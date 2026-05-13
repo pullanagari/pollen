@@ -105,101 +105,166 @@ function resetTransferState() {
 
 // ===== BARCODE SCANNING =====
 
-// SAMPLE SCANNER
-// ===== TUBE-OPTIMIZED SCANNER =====
+// ===== DETECT BEST SCANNER AVAILABLE =====
+let useBarcodeDetectionAPI = false;
 
-// SAMPLE SCANNER - Optimized for curved tubes
-// ===== BARCODE SCANNING =====
+// Check if Native Barcode Detection API is available (Chrome/Edge)
+if ('BarcodeDetector' in window) {
+    BarcodeDetector.getSupportedFormats().then(formats => {
+        console.log('Native Barcode API available with formats:', formats);
+        useBarcodeDetectionAPI = true;
+    }).catch(() => {
+        console.log('Native Barcode API not available, using html5-qrcode');
+    });
+}
 
-// SAMPLE SCANNER
+// ===== SAMPLE SCANNER - HYBRID VERSION =====
 async function startSampleScanner() {
     console.log('Starting sample scanner...');
     
-    if (sampleScanner && sampleScannerRunning) {
+    const container = document.getElementById('scanner-sample');
+    
+    // Check if Native API is available
+    if ('BarcodeDetector' in window) {
         try {
-            await sampleScanner.stop();
-            sampleScannerRunning = false;
+            await startNativeScanner('sample', container);
+            return;
         } catch (err) {
-            console.log('Stop error ignored');
+            console.log('Native scanner failed, falling back to html5-qrcode');
         }
     }
     
-    if (sampleScanner) {
-        try {
-            sampleScanner.clear();
-        } catch (err) {}
-        sampleScanner = null;
-    }
-    
-    const container = document.getElementById('scanner-sample');
-    container.innerHTML = '';
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    sampleScanner = new Html5Qrcode('scanner-sample');
-    
-    const config = {
-        fps: 30,
-        qrbox: function(viewfinderWidth, viewfinderHeight) {
-            const width = Math.min(viewfinderWidth * 0.85, 320);
-            const height = Math.floor(width * 0.35);
-            return { width: width, height: height };
-        },
-        disableFlip: false
-    };
-    
-    try {
-        await sampleScanner.start(
-            { facingMode: 'environment' },
-            config,
-            (decodedText, decodedResult) => {
-                console.log('Sample scanned:', decodedText);
-                onSampleScanned(decodedText, decodedResult);
-            }
-        );
-        
-        sampleScannerRunning = true;
-        console.log('Sample scanner started successfully');
-        
-    } catch (err) {
-        console.error('Scanner error:', err);
-        sampleScannerRunning = false;
-        container.innerHTML = `
-            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
-                <p style="font-size:18px;font-weight:600;">📷 Camera Error</p>
-                <p style="font-size:14px;margin-top:8px;">Please allow camera permissions</p>
-                <p style="font-size:12px;opacity:0.7;margin-top:8px;">${err.message}</p>
-                <button onclick="startSampleScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">Try Again</button>
-                <button onclick="showManualEntry('sample')" style="margin-top:8px;padding:10px 20px;background:#64748b;border:none;border-radius:8px;color:white;cursor:pointer;">Enter Manually</button>
-            </div>
-        `;
-    }
+    // Fallback to html5-qrcode
+    await startHtml5Scanner('sample', container);
 }
 
-// BOX SCANNER
+// ===== BOX SCANNER - HYBRID VERSION =====
 async function startBoxScanner() {
     console.log('Starting box scanner...');
     
-    if (boxScanner && boxScannerRunning) {
+    const container = document.getElementById('scanner-box');
+    
+    if ('BarcodeDetector' in window) {
         try {
-            await boxScanner.stop();
-            boxScannerRunning = false;
+            await startNativeScanner('box', container);
+            return;
         } catch (err) {
-            console.log('Stop error ignored');
+            console.log('Native scanner failed, falling back to html5-qrcode');
         }
     }
     
-    if (boxScanner) {
-        try {
-            boxScanner.clear();
-        } catch (err) {}
-        boxScanner = null;
-    }
+    await startHtml5Scanner('box', container);
+}
+
+// ===== NATIVE BARCODE API SCANNER (Chrome/Edge - BEST FOR TUBES) =====
+async function startNativeScanner(type, container) {
+    console.log(`Starting Native Barcode scanner for ${type}...`);
     
-    const container = document.getElementById('scanner-box');
+    // Stop any existing scanner
+    await stopAllScanners();
+    
+    container.innerHTML = `
+        <video id="video-${type}" autoplay playsinline style="width:100%;height:100%;object-fit:cover;"></video>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;max-width:320px;height:100px;border:3px solid #5eead4;border-radius:8px;pointer-events:none;"></div>
+    `;
+    
+    const video = document.getElementById(`video-${type}`);
+    
+    try {
+        // Get camera stream
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: 'environment',
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+            }
+        });
+        
+        video.srcObject = stream;
+        await video.play();
+        
+        // Create barcode detector
+        const barcodeDetector = new BarcodeDetector({
+            formats: [
+                'code_128',
+                'code_39',
+                'code_93',
+                'ean_13',
+                'ean_8',
+                'qr_code',
+                'upc_a',
+                'upc_e'
+            ]
+        });
+        
+        // Store for cleanup
+        if (type === 'sample') {
+            sampleScanner = { stream, detector: barcodeDetector, scanning: true };
+            sampleScannerRunning = true;
+        } else {
+            boxScanner = { stream, detector: barcodeDetector, scanning: true };
+            boxScannerRunning = true;
+        }
+        
+        // Scan loop - FAST detection
+        const scanLoop = async () => {
+            const scanner = type === 'sample' ? sampleScanner : boxScanner;
+            
+            if (!scanner || !scanner.scanning) return;
+            
+            try {
+                const barcodes = await barcodeDetector.detect(video);
+                
+                if (barcodes.length > 0) {
+                    const barcode = barcodes[0];
+                    console.log(`${type} detected:`, barcode.rawValue);
+                    
+                    // Stop scanning
+                    scanner.scanning = false;
+                    stream.getTracks().forEach(track => track.stop());
+                    
+                    // Vibrate feedback
+                    if (navigator.vibrate) navigator.vibrate(100);
+                    
+                    // Process result
+                    if (type === 'sample') {
+                        onSampleScanned(barcode.rawValue, { 
+                            result: { format: { formatName: barcode.format } } 
+                        });
+                    } else {
+                        onBoxScanned(barcode.rawValue, { 
+                            result: { format: { formatName: barcode.format } } 
+                        });
+                    }
+                    return;
+                }
+            } catch (err) {
+                console.log('Detection error:', err);
+            }
+            
+            // Continue scanning
+            requestAnimationFrame(scanLoop);
+        };
+        
+        scanLoop();
+        console.log(`Native scanner started for ${type} - EXCELLENT for tubes!`);
+        
+    } catch (err) {
+        console.error('Native scanner error:', err);
+        throw err; // Let caller handle fallback
+    }
+}
+
+// ===== HTML5-QRCODE FALLBACK (Safari, Firefox) =====
+async function startHtml5Scanner(type, container) {
+    console.log(`Starting html5-qrcode for ${type}...`);
+    
+    await stopAllScanners();
+    
     container.innerHTML = '';
     await new Promise(resolve => setTimeout(resolve, 200));
     
-    boxScanner = new Html5Qrcode('scanner-box');
+    const scanner = new Html5Qrcode(`scanner-${type}`);
     
     const config = {
         fps: 30,
@@ -212,65 +277,80 @@ async function startBoxScanner() {
     };
     
     try {
-        await boxScanner.start(
+        await scanner.start(
             { facingMode: 'environment' },
             config,
             (decodedText, decodedResult) => {
-                console.log('Box scanned:', decodedText);
-                onBoxScanned(decodedText, decodedResult);
+                console.log(`${type} scanned:`, decodedText);
+                if (type === 'sample') {
+                    onSampleScanned(decodedText, decodedResult);
+                } else {
+                    onBoxScanned(decodedText, decodedResult);
+                }
             }
         );
         
-        boxScannerRunning = true;
-        console.log('Box scanner started successfully');
+        if (type === 'sample') {
+            sampleScanner = scanner;
+            sampleScannerRunning = true;
+        } else {
+            boxScanner = scanner;
+            boxScannerRunning = true;
+        }
+        
+        console.log(`html5-qrcode started for ${type}`);
         
     } catch (err) {
-        console.error('Scanner error:', err);
-        boxScannerRunning = false;
+        console.error('html5-qrcode error:', err);
         container.innerHTML = `
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
                 <p style="font-size:18px;font-weight:600;">📷 Camera Error</p>
                 <p style="font-size:14px;margin-top:8px;">Please allow camera permissions</p>
-                <p style="font-size:12px;opacity:0.7;margin-top:8px;">${err.message}</p>
-                <button onclick="startBoxScanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">Try Again</button>
-                <button onclick="showManualEntry('box')" style="margin-top:8px;padding:10px 20px;background:#64748b;border:none;border-radius:8px;color:white;cursor:pointer;">Enter Manually</button>
+                <button onclick="start${type === 'sample' ? 'Sample' : 'Box'}Scanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">Try Again</button>
+                <button onclick="showManualEntry('${type}')" style="margin-top:8px;padding:10px 20px;background:#64748b;border:none;border-radius:8px;color:white;cursor:pointer;">Enter Manually</button>
             </div>
         `;
     }
 }
 
-// STOP ALL SCANNERS
+// ===== STOP ALL SCANNERS - UPDATED =====
 async function stopAllScanners() {
-    if (sampleScanner && sampleScannerRunning) {
+    // Stop Native API scanner
+    if (sampleScanner && sampleScanner.stream) {
         try {
-            await sampleScanner.stop();
-            sampleScannerRunning = false;
-        } catch (err) {
-            console.log('Sample scanner stop error (ignored)');
-        }
+            sampleScanner.scanning = false;
+            sampleScanner.stream.getTracks().forEach(track => track.stop());
+        } catch (err) {}
+        sampleScanner = null;
+        sampleScannerRunning = false;
     }
     
-    if (sampleScanner) {
+    if (boxScanner && boxScanner.stream) {
         try {
+            boxScanner.scanning = false;
+            boxScanner.stream.getTracks().forEach(track => track.stop());
+        } catch (err) {}
+        boxScanner = null;
+        boxScannerRunning = false;
+    }
+    
+    // Stop html5-qrcode scanner
+    if (sampleScanner && sampleScanner.stop) {
+        try {
+            await sampleScanner.stop();
             sampleScanner.clear();
         } catch (err) {}
         sampleScanner = null;
+        sampleScannerRunning = false;
     }
     
-    if (boxScanner && boxScannerRunning) {
+    if (boxScanner && boxScanner.stop) {
         try {
             await boxScanner.stop();
-            boxScannerRunning = false;
-        } catch (err) {
-            console.log('Box scanner stop error (ignored)');
-        }
-    }
-    
-    if (boxScanner) {
-        try {
             boxScanner.clear();
         } catch (err) {}
         boxScanner = null;
+        boxScannerRunning = false;
     }
 }
 
