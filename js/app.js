@@ -690,7 +690,7 @@ async function submitTransfer() {
         latitude: state.location?.lat || null,
         longitude: state.location?.lng || null,
         locationName: state.locationName || '',
-        date: now.toISOString().split('T')[0],
+        date: localDateString(now),
         time: now.toTimeString().split(' ')[0],
         timestamp: now.toISOString(),
         notes: notes,
@@ -792,8 +792,8 @@ function renderHistory(filter = 'all', search = '') {
 
     // Apply date filter
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const today = localDateString(now);
+    const weekAgo = localDateString(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
 
     if (filter === 'today') {
         filtered = filtered.filter(t => t.date === today);
@@ -941,7 +941,7 @@ function exportData() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `pollen_sardi_export_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `pollen_sardi_export_${localDateString()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
 }
@@ -968,7 +968,7 @@ function loadTransfers() {
 }
 
 function updateStats() {
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateString();
     const todayCount = state.transfers.filter(t => t.date === today).length;
     const totalCount = state.transfers.length;
 
@@ -977,6 +977,13 @@ function updateStats() {
 }
 
 // ===== UTILITIES =====
+// Calendar date (YYYY-MM-DD) in the phone's own time zone.
+// toISOString() gives the UTC date, which is a day behind in Australia before about 10am.
+function localDateString(date = new Date()) {
+    const pad = n => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 function generateId() {
     return 'tr_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
 }
@@ -993,9 +1000,10 @@ function formatDateTime(date) {
 }
 
 function formatDate(dateStr) {
-    const date = new Date(dateStr);
-    const today = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    // Parse as local midnight so the day isn't shifted by the time zone
+    const date = new Date(dateStr + 'T00:00:00');
+    const today = localDateString();
+    const yesterday = localDateString(new Date(Date.now() - 86400000));
 
     if (dateStr === today) return 'Today';
     if (dateStr === yesterday) return 'Yesterday';

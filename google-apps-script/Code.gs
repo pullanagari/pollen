@@ -108,6 +108,11 @@ function getSheet() {
     return sheet;
 }
 
+// Calendar date (YYYY-MM-DD) in the script's time zone, so "today" matches the phone's date
+function localDate(date) {
+    return Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+
 // Adds any missing column names to the end of the header row, returns all headers
 function ensureHeaders(sheet, requiredHeaders) {
     const lastColumn = sheet.getLastColumn();
@@ -140,8 +145,8 @@ function addTransfer(e) {
         latitude: data.latitude || '',
         longitude: data.longitude || '',
         location_name: data.location_name || '',
-        transfer_date: data.transfer_date || new Date().toISOString().split('T')[0],
-        transfer_time: data.transfer_time || new Date().toTimeString().split(' ')[0],
+        transfer_date: data.transfer_date || localDate(new Date()),
+        transfer_time: data.transfer_time || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm:ss'),
         timestamp: timestamp,
         notes: data.notes || '',
         user_id: data.user_id || '',
@@ -291,9 +296,9 @@ function getStats() {
     const boxCol = headers.indexOf('box_id');
     const sampleCol = headers.indexOf('sample_id');
     
-    const today = new Date().toISOString().split('T')[0];
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const today = localDate(new Date());
+    const weekAgo = localDate(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+    const monthAgo = localDate(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
     
     let todayCount = 0;
     let weekCount = 0;
