@@ -10,6 +10,7 @@ const state = {
     sampleType: null,
     boxId: null,
     boxType: null,
+    deviceLog: null,
     location: null,
     locationName: null,
     manualEntryTarget: null,
@@ -19,11 +20,8 @@ const state = {
     }
 };
 
-// Scanner instances
-let sampleScanner = null;
-let boxScanner = null;
-let sampleScannerRunning = false;
-let boxScannerRunning = false;
+// Scanner instances, keyed by scan step
+const scanners = { sample: null, box: null, log: null };
 
 // ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', () => {
@@ -31,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadTransfers();
     updateStats();
     checkOnlineStatus();
-    
+
     // Register service worker
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/pollen/service-worker.js')
@@ -43,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Online/Offline status
 function checkOnlineStatus() {
     const indicator = document.getElementById('offline-indicator');
-    
+
     const updateStatus = () => {
         if (navigator.onLine) {
             indicator.classList.remove('visible');
@@ -52,7 +50,7 @@ function checkOnlineStatus() {
             indicator.classList.add('visible');
         }
     };
-    
+
     window.addEventListener('online', updateStatus);
     window.addEventListener('offline', updateStatus);
     updateStatus();
@@ -87,6 +85,12 @@ async function goBackToBoxScan() {
     setTimeout(() => startBoxScanner(), 300);
 }
 
+async function goBackToLogScan() {
+    await stopAllScanners();
+    showScreen('scan-log');
+    setTimeout(() => startLogScanner(), 300);
+}
+
 // ===== TRANSFER WORKFLOW =====
 function startTransfer() {
     resetTransferState();
@@ -99,6 +103,7 @@ function resetTransferState() {
     state.sampleType = null;
     state.boxId = null;
     state.boxType = null;
+    state.deviceLog = null;
     state.location = null;
     state.locationName = null;
 }
@@ -121,9 +126,9 @@ if ('BarcodeDetector' in window) {
 // ===== SAMPLE SCANNER - HYBRID VERSION =====
 async function startSampleScanner() {
     console.log('Starting sample scanner...');
-    
+
     const container = document.getElementById('scanner-sample');
-    
+
     // Check if Native API is available
     if ('BarcodeDetector' in window) {
         try {
@@ -133,7 +138,7 @@ async function startSampleScanner() {
             console.log('Native scanner failed, falling back to html5-qrcode');
         }
     }
-    
+
     // Fallback to html5-qrcode
     await startHtml5Scanner('sample', container);
 }
@@ -141,9 +146,9 @@ async function startSampleScanner() {
 // ===== BOX SCANNER - HYBRID VERSION =====
 async function startBoxScanner() {
     console.log('Starting box scanner...');
-    
+
     const container = document.getElementById('scanner-box');
-    
+
     if ('BarcodeDetector' in window) {
         try {
             await startNativeScanner('box', container);
@@ -152,37 +157,86 @@ async function startBoxScanner() {
             console.log('Native scanner failed, falling back to html5-qrcode');
         }
     }
-    
+
     await startHtml5Scanner('box', container);
+}
+
+// ===== DEVICE LOG SCANNER - HYBRID VERSION =====
+async function startLogScanner() {
+    console.log('Starting device log scanner...');
+
+    const container = document.getElementById('scanner-log');
+
+    if ('BarcodeDetector' in window) {
+        try {
+            await startNativeScanner('log', container);
+            return;
+        } catch (err) {
+            console.log('Native scanner failed, falling back to html5-qrcode');
+        }
+    }
+
+    await startHtml5Scanner('log', container);
+}
+
+// Camera can still be busy for a moment after the previous scan released it (common on Android),
+// so retry before giving up and falling back
+async function acquireCamera(attempts = 4) {
+    const constraints = {
+        video: {
+            facingMode: 'environment',
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+        }
+    };
+
+    for (let attempt = 1; ; attempt++) {
+        try {
+            return await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (err) {
+            // Waiting won't fix a denied permission
+            if (err.name === 'NotAllowedError' || err.name === 'SecurityError' || attempt >= attempts) {
+                throw err;
+            }
+            console.log(`Camera busy (${err.name}), retrying (${attempt})...`);
+            await new Promise(resolve => setTimeout(resolve, 400 * attempt));
+        }
+    }
+}
+
+// Stop camera tracks and detach them from the video so the camera is actually freed
+function releaseStream(stream, video) {
+    if (video) {
+        video.pause();
+        video.srcObject = null;
+    }
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
 }
 
 // ===== NATIVE BARCODE API SCANNER (Chrome/Edge - BEST FOR TUBES) =====
 async function startNativeScanner(type, container) {
     console.log(`Starting Native Barcode scanner for ${type}...`);
-    
+
     // Stop any existing scanner
     await stopAllScanners();
-    
+
     container.innerHTML = `
         <video id="video-${type}" autoplay playsinline style="width:100%;height:100%;object-fit:cover;"></video>
         <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:90%;max-width:320px;height:100px;border:3px solid #5eead4;border-radius:8px;pointer-events:none;"></div>
     `;
-    
+
     const video = document.getElementById(`video-${type}`);
-    
+
+    let stream = null;
     try {
         // Get camera stream
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: 'environment',
-                width: { ideal: 1920 },
-                height: { ideal: 1080 }
-            }
-        });
-        
+        stream = await acquireCamera();
+
         video.srcObject = stream;
         await video.play();
-        
+
         // Create barcode detector
         const barcodeDetector = new BarcodeDetector({
             formats: [
@@ -196,76 +250,65 @@ async function startNativeScanner(type, container) {
                 'upc_e'
             ]
         });
-        
+
         // Store for cleanup
-        if (type === 'sample') {
-            sampleScanner = { stream, detector: barcodeDetector, scanning: true };
-            sampleScannerRunning = true;
-        } else {
-            boxScanner = { stream, detector: barcodeDetector, scanning: true };
-            boxScannerRunning = true;
-        }
-        
+        scanners[type] = { stream, detector: barcodeDetector, scanning: true };
+
         // Scan loop - FAST detection
         const scanLoop = async () => {
-            const scanner = type === 'sample' ? sampleScanner : boxScanner;
-            
+            const scanner = scanners[type];
+
             if (!scanner || !scanner.scanning) return;
-            
+
             try {
                 const barcodes = await barcodeDetector.detect(video);
-                
+
                 if (barcodes.length > 0) {
                     const barcode = barcodes[0];
                     console.log(`${type} detected:`, barcode.rawValue);
-                    
+
                     // Stop scanning
                     scanner.scanning = false;
-                    stream.getTracks().forEach(track => track.stop());
-                    
+                    releaseStream(stream, video);
+
                     // Vibrate feedback
                     if (navigator.vibrate) navigator.vibrate(100);
-                    
+
                     // Process result
-                    if (type === 'sample') {
-                        onSampleScanned(barcode.rawValue, { 
-                            result: { format: { formatName: barcode.format } } 
-                        });
-                    } else {
-                        onBoxScanned(barcode.rawValue, { 
-                            result: { format: { formatName: barcode.format } } 
-                        });
-                    }
+                    onScanned(type, barcode.rawValue, {
+                        result: { format: { formatName: barcode.format } }
+                    });
                     return;
                 }
             } catch (err) {
                 console.log('Detection error:', err);
             }
-            
+
             // Continue scanning
             requestAnimationFrame(scanLoop);
         };
-        
+
         scanLoop();
         console.log(`Native scanner started for ${type} - EXCELLENT for tubes!`);
-        
+
     } catch (err) {
         console.error('Native scanner error:', err);
+        releaseStream(stream, video);
         throw err; // Let caller handle fallback
     }
 }
 
-// ===== HTML5-QRCODE FALLBACK (Safari, Firefox) =====
+// ===== HTML5-QRCODE FALLBACK (Safari, Firefox, iPhone) =====
 async function startHtml5Scanner(type, container) {
     console.log(`Starting html5-qrcode for ${type}...`);
-    
+
     await stopAllScanners();
-    
+
     container.innerHTML = '';
     await new Promise(resolve => setTimeout(resolve, 200));
-    
+
     const scanner = new Html5Qrcode(`scanner-${type}`);
-    
+
     const config = {
         fps: 30,
         qrbox: function(viewfinderWidth, viewfinderHeight) {
@@ -275,100 +318,83 @@ async function startHtml5Scanner(type, container) {
         },
         disableFlip: false
     };
-    
+
     try {
         await scanner.start(
             { facingMode: 'environment' },
             config,
             (decodedText, decodedResult) => {
                 console.log(`${type} scanned:`, decodedText);
-                if (type === 'sample') {
-                    onSampleScanned(decodedText, decodedResult);
-                } else {
-                    onBoxScanned(decodedText, decodedResult);
-                }
+                onScanned(type, decodedText, decodedResult);
             }
         );
-        
-        if (type === 'sample') {
-            sampleScanner = scanner;
-            sampleScannerRunning = true;
-        } else {
-            boxScanner = scanner;
-            boxScannerRunning = true;
-        }
-        
+
+        scanners[type] = scanner;
+
         console.log(`html5-qrcode started for ${type}`);
-        
+
     } catch (err) {
         console.error('html5-qrcode error:', err);
+        const label = type.charAt(0).toUpperCase() + type.slice(1);
         container.innerHTML = `
             <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:white;padding:20px;text-align:center;">
                 <p style="font-size:18px;font-weight:600;">📷 Camera Error</p>
                 <p style="font-size:14px;margin-top:8px;">Please allow camera permissions</p>
-                <button onclick="start${type === 'sample' ? 'Sample' : 'Box'}Scanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">Try Again</button>
+                <button onclick="start${label}Scanner()" style="margin-top:20px;padding:10px 20px;background:#0d9488;border:none;border-radius:8px;color:white;cursor:pointer;">Try Again</button>
                 <button onclick="showManualEntry('${type}')" style="margin-top:8px;padding:10px 20px;background:#64748b;border:none;border-radius:8px;color:white;cursor:pointer;">Enter Manually</button>
             </div>
         `;
     }
 }
 
-// ===== STOP ALL SCANNERS - UPDATED =====
+// ===== STOP ALL SCANNERS =====
 async function stopAllScanners() {
-    // Stop Native API scanner
-    if (sampleScanner && sampleScanner.stream) {
-        try {
-            sampleScanner.scanning = false;
-            sampleScanner.stream.getTracks().forEach(track => track.stop());
-        } catch (err) {}
-        sampleScanner = null;
-        sampleScannerRunning = false;
-    }
-    
-    if (boxScanner && boxScanner.stream) {
-        try {
-            boxScanner.scanning = false;
-            boxScanner.stream.getTracks().forEach(track => track.stop());
-        } catch (err) {}
-        boxScanner = null;
-        boxScannerRunning = false;
-    }
-    
-    // Stop html5-qrcode scanner
-    if (sampleScanner && sampleScanner.stop) {
-        try {
-            await sampleScanner.stop();
-            sampleScanner.clear();
-        } catch (err) {}
-        sampleScanner = null;
-        sampleScannerRunning = false;
-    }
-    
-    if (boxScanner && boxScanner.stop) {
-        try {
-            await boxScanner.stop();
-            boxScanner.clear();
-        } catch (err) {}
-        boxScanner = null;
-        boxScannerRunning = false;
+    for (const type of Object.keys(scanners)) {
+        const scanner = scanners[type];
+        if (!scanner) continue;
+        scanners[type] = null;
+
+        if (scanner.stream) {
+            // Native API scanner
+            try {
+                scanner.scanning = false;
+                releaseStream(scanner.stream, document.getElementById(`video-${type}`));
+            } catch (err) {}
+        } else if (scanner.stop) {
+            // html5-qrcode scanner
+            try {
+                await scanner.stop();
+                scanner.clear();
+            } catch (err) {}
+        }
     }
 }
 
 // SCAN CALLBACKS
+function onScanned(type, decodedText, decodedResult) {
+    if (type === 'sample') {
+        onSampleScanned(decodedText, decodedResult);
+    } else if (type === 'box') {
+        onBoxScanned(decodedText, decodedResult);
+    } else {
+        onLogScanned(decodedText);
+    }
+}
+
 async function onSampleScanned(decodedText, decodedResult) {
     if (navigator.vibrate) {
         navigator.vibrate(100);
     }
-    
+
     state.sampleId = decodedText;
     state.sampleType = getBarcodeType(decodedResult);
-    
+
     await stopAllScanners();
     await new Promise(resolve => setTimeout(resolve, 200));
-    
+
     document.getElementById('captured-sample-id').textContent = truncateText(state.sampleId, 15);
     showScreen('scan-box');
-    
+
     setTimeout(() => startBoxScanner(), 300);
 }
 
@@ -376,13 +402,42 @@ async function onBoxScanned(decodedText, decodedResult) {
     if (navigator.vibrate) {
         navigator.vibrate(100);
     }
-    
+
     state.boxId = decodedText;
     state.boxType = getBarcodeType(decodedResult);
-    
+
     await stopAllScanners();
-    
+
+    showScreen('scan-log');
+    setTimeout(() => startLogScanner(), 300);
+}
+
+async function onLogScanned(decodedText) {
+    const log = parseDeviceLog(decodedText);
+
+    if (!log) {
+        // Not a device log (e.g. a tube barcode), so scan again
+        console.log('Barcode is not a device log:', decodedText);
+        await stopAllScanners();
+        alert('That barcode is not a device log. Scan the device log barcode, or tap Skip log.');
+        setTimeout(() => startLogScanner(), 300);
+        return;
+    }
+
+    if (navigator.vibrate) {
+        navigator.vibrate(100);
+    }
+
+    state.deviceLog = log;
+
+    await stopAllScanners();
     setTimeout(() => showReviewScreen(), 200);
+}
+
+async function skipLogScan() {
+    state.deviceLog = null;
+    await stopAllScanners();
+    showReviewScreen();
 }
 
 function getBarcodeType(decodedResult) {
@@ -400,11 +455,11 @@ function showManualEntry(target) {
     const modal = document.getElementById('modal-manual');
     const title = document.getElementById('modal-manual-title');
     const input = document.getElementById('manual-input');
-    
+
     title.textContent = target === 'sample' ? 'Enter Sample ID' : 'Enter Box ID';
     input.value = '';
     input.placeholder = target === 'sample' ? 'e.g., SPL-00123' : 'e.g., BOX-A-042';
-    
+
     modal.classList.add('active');
     input.focus();
 }
@@ -417,46 +472,141 @@ function closeManualEntry() {
 async function submitManualEntry() {
     const input = document.getElementById('manual-input');
     const value = input.value.trim();
-    
+
     if (!value) {
         input.focus();
         return;
     }
-    
+
     if (state.manualEntryTarget === 'sample') {
         state.sampleId = value;
         state.sampleType = 'Manual';
-        
+
         await stopAllScanners();
         closeManualEntry();
-        
+
         document.getElementById('captured-sample-id').textContent = truncateText(state.sampleId, 15);
         showScreen('scan-box');
         setTimeout(() => startBoxScanner(), 300);
     } else if (state.manualEntryTarget === 'box') {
         state.boxId = value;
         state.boxType = 'Manual';
-        
+
         await stopAllScanners();
         closeManualEntry();
-        
-        setTimeout(() => showReviewScreen(), 200);
+
+        showScreen('scan-log');
+        setTimeout(() => startLogScanner(), 300);
     }
+}
+
+// ===== DEVICE LOG =====
+// Log line format: "9/3/2026 10:54    CHECK_INTERVAL    2814 RPM    13.84V"
+// Dates are month/day/year
+const DEVICE_LOG_LINE = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}:\d{2}(?::\d{2})?)\s+([A-Z_]+)\s+(.*?)\s+(-?\d+(?:\.\d+)?)V\s*$/;
+const DEVICE_LOG_START_EVENTS = ['START_FAST', 'START_SLOW'];
+const DEVICE_LOG_STOP_EVENTS = ['AUTO_STOP', 'MANUAL_STOP'];
+
+// Columns stored on every transfer, in the order they appear in exports and the sheet
+const DEVICE_LOG_FIELDS = [
+    'run_mode',
+    'run_start_date',
+    'run_start_time',
+    'run_end_date',
+    'run_end_time',
+    'stop_reason',
+    'rotor_speed_rpm',
+    'battery_start_v',
+    'battery_end_v'
+];
+
+// Reads the device log text and summarises the most recent run:
+// the last START event, and the first STOP after it
+function parseDeviceLog(text) {
+    const entries = [];
+
+    (text || '').split(/\r?\n/).forEach(line => {
+        const match = line.trim().match(DEVICE_LOG_LINE);
+        if (!match) return;
+
+        const [, month, day, year, time, event, detail, volts] = match;
+        const [hours, minutes, seconds = '00'] = time.split(':');
+
+        entries.push({
+            date: `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`,
+            time: `${hours.padStart(2, '0')}:${minutes}:${seconds}`,
+            event: event,
+            detail: detail,
+            volts: parseFloat(volts)
+        });
+    });
+
+    let startIdx = -1;
+    for (let i = entries.length - 1; i >= 0; i--) {
+        if (DEVICE_LOG_START_EVENTS.includes(entries[i].event)) {
+            startIdx = i;
+            break;
+        }
+    }
+    if (startIdx === -1) return null;
+
+    const run = entries.slice(startIdx);
+    const stopOffset = run.findIndex(e => DEVICE_LOG_STOP_EVENTS.includes(e.event));
+    const runEntries = stopOffset === -1 ? run : run.slice(0, stopOffset + 1);
+
+    const start = runEntries[0];
+    const stop = stopOffset === -1 ? null : run[stopOffset];
+    const last = runEntries[runEntries.length - 1];
+
+    const rpmReadings = runEntries.filter(e => e.event === 'CHECK_INTERVAL' && /RPM/i.test(e.detail));
+    const lastRpm = rpmReadings.length ? parseInt(rpmReadings[rpmReadings.length - 1].detail, 10) : null;
+
+    return {
+        run_mode: start.event === 'START_FAST' ? 'FAST' : 'SLOW',
+        run_start_date: start.date,
+        run_start_time: start.time,
+        run_end_date: stop ? stop.date : '',
+        run_end_time: stop ? stop.time : '',
+        stop_reason: stop ? (stop.event === 'AUTO_STOP' ? 'Auto' : 'Manual') : '',
+        rotor_speed_rpm: lastRpm,
+        battery_start_v: start.volts,
+        battery_end_v: last.volts
+    };
+}
+
+function formatDeviceLog(log) {
+    if (!log) return 'No device log scanned';
+
+    const end = log.run_end_time ? `${log.run_end_date} ${log.run_end_time}` : 'no stop recorded';
+    const rpm = log.rotor_speed_rpm != null ? `${log.rotor_speed_rpm} RPM` : 'no RPM reading';
+
+    return `${log.run_mode} run · ${log.run_start_date} ${log.run_start_time} → ${end} · ${rpm} · ${log.battery_start_v}V → ${log.battery_end_v}V`;
+}
+
+// Device log values for one transfer, blank when no log was scanned
+function deviceLogValues(transfer) {
+    const log = transfer.deviceLog || {};
+    const values = {};
+    DEVICE_LOG_FIELDS.forEach(field => {
+        values[field] = log[field] ?? '';
+    });
+    return values;
 }
 
 // ===== REVIEW SCREEN =====
 function showReviewScreen() {
     showScreen('review');
-    
+
     // Populate form fields
     document.getElementById('input-sample-id').value = state.sampleId;
     document.getElementById('input-box-id').value = state.boxId;
     document.getElementById('input-notes').value = '';
-    
+    document.getElementById('display-log').textContent = formatDeviceLog(state.deviceLog);
+
     // Set date/time
     const now = new Date();
     document.getElementById('display-datetime').textContent = formatDateTime(now);
-    
+
     // Get location
     getLocation();
 }
@@ -464,7 +614,7 @@ function showReviewScreen() {
 function getLocation() {
     const display = document.getElementById('display-location');
     display.innerHTML = '<span class="loading-text">Getting location...</span>';
-    
+
     if ('geolocation' in navigator) {
         navigator.geolocation.getCurrentPosition(
             async (position) => {
@@ -472,14 +622,14 @@ function getLocation() {
                     lat: position.coords.latitude,
                     lng: position.coords.longitude
                 };
-                
+
                 // Try to get location name via reverse geocoding
                 try {
                     const response = await fetch(
                         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${state.location.lat}&lon=${state.location.lng}`
                     );
                     const data = await response.json();
-                    
+
                     if (data.address) {
                         const parts = [];
                         if (data.address.building) parts.push(data.address.building);
@@ -494,7 +644,7 @@ function getLocation() {
                 } catch (err) {
                     state.locationName = `${state.location.lat.toFixed(4)}, ${state.location.lng.toFixed(4)}`;
                 }
-                
+
                 display.textContent = state.locationName;
             },
             (error) => {
@@ -522,14 +672,14 @@ async function submitTransfer() {
     const sampleId = document.getElementById('input-sample-id').value.trim();
     const boxId = document.getElementById('input-box-id').value.trim();
     const notes = document.getElementById('input-notes').value.trim();
-    
+
     if (!sampleId || !boxId) {
         alert('Sample ID and Box ID are required');
         return;
     }
-    
+
     showLoading('Logging transfer...');
-    
+
     const now = new Date();
     const transfer = {
         id: generateId(),
@@ -544,13 +694,14 @@ async function submitTransfer() {
         time: now.toTimeString().split(' ')[0],
         timestamp: now.toISOString(),
         notes: notes,
+        deviceLog: state.deviceLog,
         synced: false
     };
-    
+
     // Save locally
     state.transfers.unshift(transfer);
     saveTransfers();
-    
+
     // Try to sync to cloud
     if (navigator.onLine && state.settings.apiUrl) {
         try {
@@ -563,20 +714,20 @@ async function submitTransfer() {
             console.error('Sync failed:', err);
         }
     }
-    
+
     hideLoading();
-    
+
     // Show success
     document.getElementById('success-sample').textContent = truncateText(sampleId, 12);
     document.getElementById('success-box').textContent = truncateText(boxId, 12);
     showScreen('success');
-    
+
     updateStats();
 }
 
 async function syncTransfer(transfer) {
     if (!state.settings.apiUrl) return false;
-    
+
     try {
         const response = await fetch(state.settings.apiUrl, {
             method: 'POST',
@@ -594,10 +745,11 @@ async function syncTransfer(transfer) {
                 location_name: transfer.locationName,
                 transfer_date: transfer.date,
                 transfer_time: transfer.time,
-                notes: transfer.notes
+                notes: transfer.notes,
+                ...deviceLogValues(transfer)
             })
         });
-        
+
         return true;
     } catch (err) {
         console.error('Sync error:', err);
@@ -607,9 +759,9 @@ async function syncTransfer(transfer) {
 
 async function syncPendingTransfers() {
     if (!state.settings.apiUrl) return;
-    
+
     const pending = state.transfers.filter(t => !t.synced);
-    
+
     for (const transfer of pending) {
         try {
             const synced = await syncTransfer(transfer);
@@ -620,7 +772,7 @@ async function syncPendingTransfers() {
             console.error('Sync failed for transfer:', transfer.id, err);
         }
     }
-    
+
     saveTransfers();
 }
 
@@ -637,28 +789,28 @@ function showHistory() {
 function renderHistory(filter = 'all', search = '') {
     const list = document.getElementById('history-list');
     let filtered = [...state.transfers];
-    
+
     // Apply date filter
     const now = new Date();
     const today = now.toISOString().split('T')[0];
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    
+
     if (filter === 'today') {
         filtered = filtered.filter(t => t.date === today);
     } else if (filter === 'week') {
         filtered = filtered.filter(t => t.date >= weekAgo);
     }
-    
+
     // Apply search
     if (search) {
         const searchLower = search.toLowerCase();
-        filtered = filtered.filter(t => 
+        filtered = filtered.filter(t =>
             t.sampleId.toLowerCase().includes(searchLower) ||
             t.boxId.toLowerCase().includes(searchLower) ||
             (t.notes && t.notes.toLowerCase().includes(searchLower))
         );
     }
-    
+
     if (filtered.length === 0) {
         list.innerHTML = `
             <div class="empty-state">
@@ -674,7 +826,7 @@ function renderHistory(filter = 'all', search = '') {
         `;
         return;
     }
-    
+
     list.innerHTML = filtered.map(t => `
         <div class="history-item">
             <div class="history-transfer">
@@ -686,6 +838,7 @@ function renderHistory(filter = 'all', search = '') {
                 <span>📅 ${formatDate(t.date)} ${formatTime(t.time)}</span>
                 ${t.locationName ? `<span>📍 ${escapeHtml(truncateText(t.locationName, 20))}</span>` : ''}
             </div>
+            ${t.deviceLog ? `<div class="history-meta"><span>📋 ${escapeHtml(formatDeviceLog(t.deviceLog))}</span></div>` : ''}
             ${t.notes ? `<div class="history-notes">${escapeHtml(t.notes)}</div>` : ''}
         </div>
     `).join('');
@@ -724,7 +877,7 @@ function saveSettings() {
     state.settings.apiUrl = document.getElementById('settings-api-url').value.trim();
     localStorage.setItem('pollen_sardi_settings', JSON.stringify(state.settings));
     closeSettings();
-    
+
     if (state.settings.apiUrl && navigator.onLine) {
         syncPendingTransfers();
     }
@@ -756,29 +909,34 @@ function exportData() {
         alert('No data to export');
         return;
     }
-    
-    const headers = ['Transfer ID', 'Sample ID', 'Sample Type', 'Box ID', 'Box Type', 
-                     'Latitude', 'Longitude', 'Location', 'Date', 'Time', 'Notes', 'Synced'];
-    
-    const rows = state.transfers.map(t => [
-        t.id,
-        t.sampleId,
-        t.sampleType,
-        t.boxId,
-        t.boxType,
-        t.latitude || '',
-        t.longitude || '',
-        t.locationName || '',
-        t.date,
-        t.time,
-        t.notes || '',
-        t.synced ? 'Yes' : 'No'
-    ]);
-    
+
+    const headers = ['Transfer ID', 'Sample ID', 'Sample Type', 'Box ID', 'Box Type',
+                     'Latitude', 'Longitude', 'Location', 'Date', 'Time', 'Notes', 'Synced',
+                     ...DEVICE_LOG_FIELDS];
+
+    const rows = state.transfers.map(t => {
+        const logValues = deviceLogValues(t);
+        return [
+            t.id,
+            t.sampleId,
+            t.sampleType,
+            t.boxId,
+            t.boxType,
+            t.latitude || '',
+            t.longitude || '',
+            t.locationName || '',
+            t.date,
+            t.time,
+            t.notes || '',
+            t.synced ? 'Yes' : 'No',
+            ...DEVICE_LOG_FIELDS.map(field => logValues[field])
+        ];
+    });
+
     const csv = [headers, ...rows]
         .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
         .join('\n');
-    
+
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -813,7 +971,7 @@ function updateStats() {
     const today = new Date().toISOString().split('T')[0];
     const todayCount = state.transfers.filter(t => t.date === today).length;
     const totalCount = state.transfers.length;
-    
+
     document.getElementById('stat-today').textContent = todayCount;
     document.getElementById('stat-total').textContent = totalCount;
 }
@@ -824,9 +982,9 @@ function generateId() {
 }
 
 function formatDateTime(date) {
-    const options = { 
-        day: '2-digit', 
-        month: 'short', 
+    const options = {
+        day: '2-digit',
+        month: 'short',
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
@@ -838,10 +996,10 @@ function formatDate(dateStr) {
     const date = new Date(dateStr);
     const today = new Date().toISOString().split('T')[0];
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    
+
     if (dateStr === today) return 'Today';
     if (dateStr === yesterday) return 'Yesterday';
-    
+
     return date.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' });
 }
 
@@ -881,7 +1039,7 @@ document.addEventListener('keydown', (e) => {
         closeManualEntry();
         closeSettings();
     }
-    
+
     if (e.key === 'Enter' && document.getElementById('modal-manual').classList.contains('active')) {
         submitManualEntry();
     }

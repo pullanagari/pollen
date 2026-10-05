@@ -89,7 +89,16 @@ function getSheet() {
             'timestamp',
             'notes',
             'user_id',
-            'created_at'
+            'created_at',
+            'run_mode',
+            'run_start_date',
+            'run_start_time',
+            'run_end_date',
+            'run_end_time',
+            'stop_reason',
+            'rotor_speed_rpm',
+            'battery_start_v',
+            'battery_end_v'
         ];
         sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
         sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
@@ -97,6 +106,21 @@ function getSheet() {
     }
     
     return sheet;
+}
+
+// Adds any missing column names to the end of the header row, returns all headers
+function ensureHeaders(sheet, requiredHeaders) {
+    const lastColumn = sheet.getLastColumn();
+    const headers = lastColumn ? sheet.getRange(1, 1, 1, lastColumn).getValues()[0] : [];
+
+    requiredHeaders.forEach(name => {
+        if (headers.indexOf(name) === -1) {
+            headers.push(name);
+            sheet.getRange(1, headers.length).setValue(name).setFontWeight('bold');
+        }
+    });
+
+    return headers;
 }
 
 // ===== API METHODS =====
@@ -107,24 +131,36 @@ function addTransfer(e) {
     const transferId = 'POL-' + Utilities.getUuid().substring(0, 8).toUpperCase();
     const timestamp = new Date().toISOString();
     
-    const row = [
-        transferId,
-        data.sample_id || '',
-        data.sample_type || 'Unknown',
-        data.box_id || '',
-        data.box_type || 'Unknown',
-        data.latitude || '',
-        data.longitude || '',
-        data.location_name || '',
-        data.transfer_date || new Date().toISOString().split('T')[0],
-        data.transfer_time || new Date().toTimeString().split(' ')[0],
-        timestamp,
-        data.notes || '',
-        data.user_id || '',
-        timestamp
-    ];
-    
-    sheet.appendRow(row);
+    const values = {
+        transfer_id: transferId,
+        sample_id: data.sample_id || '',
+        sample_type: data.sample_type || 'Unknown',
+        box_id: data.box_id || '',
+        box_type: data.box_type || 'Unknown',
+        latitude: data.latitude || '',
+        longitude: data.longitude || '',
+        location_name: data.location_name || '',
+        transfer_date: data.transfer_date || new Date().toISOString().split('T')[0],
+        transfer_time: data.transfer_time || new Date().toTimeString().split(' ')[0],
+        timestamp: timestamp,
+        notes: data.notes || '',
+        user_id: data.user_id || '',
+        created_at: timestamp,
+        run_mode: data.run_mode || '',
+        run_start_date: data.run_start_date || '',
+        run_start_time: data.run_start_time || '',
+        run_end_date: data.run_end_date || '',
+        run_end_time: data.run_end_time || '',
+        stop_reason: data.stop_reason || '',
+        rotor_speed_rpm: data.rotor_speed_rpm || '',
+        battery_start_v: data.battery_start_v || '',
+        battery_end_v: data.battery_end_v || ''
+    };
+
+    // Write each value under its column name, so sheets created before
+    // the device log columns existed still line up
+    const headers = ensureHeaders(sheet, Object.keys(values));
+    sheet.appendRow(headers.map(header => values[header] !== undefined ? values[header] : ''));
     
     return {
         success: true,

@@ -76,6 +76,15 @@ The app creates a sheet with these columns:
 | notes | User-entered notes |
 | user_id | Device identifier |
 | created_at | Server timestamp |
+| run_mode | FAST or SLOW (from the device log) |
+| run_start_date | Run start date, YYYY-MM-DD |
+| run_start_time | Run start time, HH:MM:SS |
+| run_end_date | Run end date, YYYY-MM-DD |
+| run_end_time | Run end time, HH:MM:SS |
+| stop_reason | Auto or Manual |
+| rotor_speed_rpm | Last RPM reading in the run |
+| battery_start_v | Battery voltage at run start |
+| battery_end_v | Battery voltage at run end |
 
 ## Supported Barcode Types
 

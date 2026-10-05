@@ -1,4 +1,5 @@
-const CACHE_NAME = 'pollen-sardi-v1';
+// Bump this whenever app files change, otherwise phones keep serving the cached old app.js
+const CACHE_NAME = 'pollen-sardi-v2';
 
 const urlsToCache = [
     '/pollen/',
