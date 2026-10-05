@@ -50,19 +50,27 @@ self.addEventListener('activate', (event) => {
     return self.clients.claim();
 });
 
-// FETCH - Serve from cache, fallback to network
+// FETCH - Network first so updates reach the phone straight away,
+// fall back to the cached copy only when offline
 self.addEventListener('fetch', (event) => {
+    // Only handle GET requests for this app's own files
+    if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) {
+        return;
+    }
+
     event.respondWith(
-        caches.match(event.request)
+        fetch(event.request)
             .then((response) => {
-                // Return cached version or fetch from network
-                return response || fetch(event.request);
+                const copy = response.clone();
+                caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+                return response;
             })
             .catch(() => {
-                // If both cache and network fail, return nothing
-                return new Response('Offline', {
-                    status: 503,
-                    statusText: 'Service Unavailable'
+                return caches.match(event.request).then((cached) => {
+                    return cached || new Response('Offline', {
+                        status: 503,
+                        statusText: 'Service Unavailable'
+                    });
                 });
             })
     );
