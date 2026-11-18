@@ -1,0 +1,40 @@
+{
+    "name": "Pollen_SARDI - Pollen Sample Tracker",
+    "short_name": "Pollen_SARDI",
+    "description": "Track pollen sample transfers by scanning source and destination barcodes",
+    "start_url": "/pollen/",
+    "scope": "/pollen/",
+    "display": "standalone",
+    "background_color": "#f8fafc",
+    "theme_color": "#0d9488",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "/pollen/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/pollen/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": ["productivity", "utilities"],
+    "shortcuts": [
+        {
+            "name": "Start Transfer",
+            "short_name": "Transfer",
+            "description": "Start a new pollen sample transfer",
+            "url": "/pollen/?action=transfer",
+            "icons": [
+                {
+                    "src": "/pollen/icons/icon-192.png",
+                    "sizes": "192x192"
+                }
+            ]
+        }
+    ]
+}
